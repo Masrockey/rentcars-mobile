@@ -15,6 +15,11 @@ export const BrandColors = {
   secondaryContainer: '#fea619',
   onSecondaryContainer: '#684000',
   secondaryFixed: '#ffddb8',
+  onSecondaryFixed: '#2a1700',
+  onSecondaryFixedVariant: '#653e00',
+
+  inverseSurface: '#283044',
+  inverseOnSurface: '#eef0ff',
 
   tertiary: '#0051d5',
   tertiaryContainer: '#316bf3',

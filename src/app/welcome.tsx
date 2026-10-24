@@ -104,6 +104,14 @@ export default function BerandaScreen() {
   };
 
   const handleMenuClick = (menuName: string) => {
+    if (menuName === 'Booking' || menuName === 'Halaman Booking' || menuName === 'Lihat Semua Booking') {
+      router.push('/booking' as any);
+      return;
+    }
+    if (menuName === 'Buat Booking Baru' || menuName === 'Baru') {
+      router.push('/booking-create' as any);
+      return;
+    }
     Alert.alert('Menu Operasional', `Fitur ${menuName} sedang dibuka.`, [{ text: 'OK' }]);
   };
 
@@ -133,7 +141,323 @@ export default function BerandaScreen() {
     return name.slice(0, 2).toUpperCase();
   };
 
-  const fullUserName = user?.name || 'Super Admin';
+  const fullUserName = user?.name || 'Pengguna';
+
+  const userRoles = (user?.roles || []).map((r) => String(r).toLowerCase().trim());
+  const isSuperAdmin = Boolean(
+    user?.is_super_admin ||
+    userRoles.includes('super admin') ||
+    userRoles.includes('superadmin')
+  );
+  const isAdmin = Boolean(
+    isSuperAdmin ||
+    user?.is_admin ||
+    userRoles.includes('admin')
+  );
+  const isMarketing = Boolean(
+    !isAdmin && (
+      user?.is_marketing ||
+      userRoles.includes('marketing')
+    )
+  );
+  const isPeluncur = Boolean(
+    !isAdmin && (
+      user?.is_peluncur ||
+      userRoles.includes('peluncur')
+    )
+  );
+  const isDriver = Boolean(
+    !isAdmin && (
+      user?.is_driver ||
+      userRoles.includes('driver') ||
+      userRoles.includes('supir')
+    )
+  );
+  const isPetugasCuci = Boolean(
+    !isAdmin && (
+      user?.is_petugas_cuci ||
+      userRoles.includes('petugas cuci') ||
+      userRoles.includes('petugascuci')
+    )
+  );
+
+  interface MenuItem {
+    id: string;
+    title: string;
+    icon: keyof typeof MaterialIcons.glyphMap;
+    circleBg?: string;
+    iconColor?: string;
+    onPress: () => void;
+  }
+
+  interface MenuGroup {
+    title: string;
+    items: MenuItem[];
+  }
+
+  const menuGroups: MenuGroup[] = (() => {
+    // 1. ADMIN & SUPER ADMIN: Akses penuh (Semua 3 grup)
+    if (isAdmin) {
+      return [
+        {
+          title: 'Layanan Utama',
+          items: [
+            {
+              id: 'booking',
+              title: 'Booking',
+              icon: 'calendar-month',
+              circleBg: 'rgba(204,229,255,0.7)',
+              iconColor: BrandColors.primary,
+              onPress: () => handleMenuClick('Booking'),
+            },
+            {
+              id: 'alokasi',
+              title: 'Alokasi',
+              icon: 'vpn-key',
+              circleBg: 'rgba(255,221,184,0.6)',
+              iconColor: BrandColors.secondary,
+              onPress: () => handleMenuClick('Alokasi'),
+            },
+            {
+              id: 'serah_unit',
+              title: 'Serah Unit',
+              icon: 'handshake',
+              circleBg: 'rgba(219,225,255,0.7)',
+              iconColor: BrandColors.tertiary,
+              onPress: () => handleMenuClick('Serah Unit'),
+            },
+            {
+              id: 'kembali',
+              title: 'Kembali',
+              icon: 'swap-horizontal-circle',
+              circleBg: BrandColors.surfaceContainerHigh,
+              iconColor: BrandColors.primary,
+              onPress: () => handleMenuClick('Kembali'),
+            },
+          ],
+        },
+        {
+          title: 'Manajemen & Finansial',
+          items: [
+            {
+              id: 'data_mobil',
+              title: 'Data Mobil',
+              icon: 'directions-car',
+              onPress: () => handleMenuClick('Data Mobil'),
+            },
+            {
+              id: 'bayar',
+              title: 'Bayar',
+              icon: 'payments',
+              onPress: () => handleMenuClick('Bayar'),
+            },
+            {
+              id: 'servis',
+              title: 'Servis',
+              icon: 'car-repair',
+              onPress: () => handleMenuClick('Servis'),
+            },
+            {
+              id: 'sopir',
+              title: 'Sopir',
+              icon: 'badge',
+              onPress: () => handleMenuClick('Sopir'),
+            },
+          ],
+        },
+        {
+          title: 'Proteksi & Laporan',
+          items: [
+            {
+              id: 'asuransi',
+              title: 'Asuransi',
+              icon: 'shield',
+              onPress: () => handleMenuClick('Asuransi'),
+            },
+            {
+              id: 'laporan',
+              title: 'Laporan',
+              icon: 'query-stats',
+              onPress: () => handleMenuClick('Laporan'),
+            },
+            {
+              id: 'tarif',
+              title: 'Tarif',
+              icon: 'style',
+              onPress: () => handleMenuClick('Tarif'),
+            },
+            {
+              id: 'lainnya',
+              title: 'Lainnya',
+              icon: 'grid-view',
+              onPress: () => handleMenuClick('Lainnya'),
+            },
+          ],
+        },
+      ];
+    }
+
+    // 2. MARKETING: Hanya menu pemasaran, buat booking, cek tarif, dan konsumen
+    if (isMarketing) {
+      return [
+        {
+          title: 'Layanan Pemasaran',
+          items: [
+            {
+              id: 'booking',
+              title: 'Booking',
+              icon: 'calendar-month',
+              circleBg: 'rgba(204,229,255,0.7)',
+              iconColor: BrandColors.primary,
+              onPress: () => handleMenuClick('Booking'),
+            },
+            {
+              id: 'buat_booking',
+              title: 'Buat Baru',
+              icon: 'add-circle-outline',
+              circleBg: 'rgba(255,221,184,0.6)',
+              iconColor: BrandColors.secondary,
+              onPress: () => router.push('/booking-create' as any),
+            },
+            {
+              id: 'tarif',
+              title: 'Tarif Sewa',
+              icon: 'style',
+              circleBg: 'rgba(219,225,255,0.7)',
+              iconColor: BrandColors.tertiary,
+              onPress: () => handleMenuClick('Tarif Sewa'),
+            },
+            {
+              id: 'pelanggan',
+              title: 'Konsumen',
+              icon: 'people',
+              circleBg: BrandColors.surfaceContainerHigh,
+              iconColor: BrandColors.primary,
+              onPress: () => handleMenuClick('Data Konsumen'),
+            },
+          ],
+        },
+      ];
+    }
+
+    // 3. PELUNCUR: Serah terima & pengembalian unit
+    if (isPeluncur) {
+      return [
+        {
+          title: 'Tugas Operasional',
+          items: [
+            {
+              id: 'booking',
+              title: 'Tugas Saya',
+              icon: 'calendar-month',
+              circleBg: 'rgba(204,229,255,0.7)',
+              iconColor: BrandColors.primary,
+              onPress: () => handleMenuClick('Booking'),
+            },
+            {
+              id: 'serah_unit',
+              title: 'Serah Unit',
+              icon: 'handshake',
+              circleBg: 'rgba(219,225,255,0.7)',
+              iconColor: BrandColors.tertiary,
+              onPress: () => handleMenuClick('Serah Unit'),
+            },
+            {
+              id: 'kembali',
+              title: 'Kembali',
+              icon: 'swap-horizontal-circle',
+              circleBg: BrandColors.surfaceContainerHigh,
+              iconColor: BrandColors.primary,
+              onPress: () => handleMenuClick('Kembali'),
+            },
+            {
+              id: 'data_mobil',
+              title: 'Data Mobil',
+              icon: 'directions-car',
+              onPress: () => handleMenuClick('Data Mobil'),
+            },
+          ],
+        },
+      ];
+    }
+
+    // 4. DRIVER: Jadwal supir & log perjalanan
+    if (isDriver) {
+      return [
+        {
+          title: 'Tugas Supir',
+          items: [
+            {
+              id: 'booking',
+              title: 'Jadwal Trip',
+              icon: 'calendar-month',
+              circleBg: 'rgba(204,229,255,0.7)',
+              iconColor: BrandColors.primary,
+              onPress: () => handleMenuClick('Booking'),
+            },
+            {
+              id: 'sopir',
+              title: 'Log Trip',
+              icon: 'badge',
+              circleBg: 'rgba(255,221,184,0.6)',
+              iconColor: BrandColors.secondary,
+              onPress: () => handleMenuClick('Log Perjalanan'),
+            },
+          ],
+        },
+      ];
+    }
+
+    // 5. PETUGAS CUCI: Tugas pembersihan armada
+    if (isPetugasCuci) {
+      return [
+        {
+          title: 'Tugas Kebersihan',
+          items: [
+            {
+              id: 'booking',
+              title: 'Tugas Cuci',
+              icon: 'calendar-month',
+              circleBg: 'rgba(204,229,255,0.7)',
+              iconColor: BrandColors.primary,
+              onPress: () => handleMenuClick('Booking'),
+            },
+            {
+              id: 'data_mobil',
+              title: 'Data Mobil',
+              icon: 'directions-car',
+              onPress: () => handleMenuClick('Data Mobil'),
+            },
+          ],
+        },
+      ];
+    }
+
+    // Default Fallback
+    return [
+      {
+        title: 'Layanan Utama',
+        items: [
+          {
+            id: 'booking',
+            title: 'Booking',
+            icon: 'calendar-month',
+            circleBg: 'rgba(204,229,255,0.7)',
+            iconColor: BrandColors.primary,
+            onPress: () => handleMenuClick('Booking'),
+          },
+          {
+            id: 'tarif',
+            title: 'Tarif',
+            icon: 'style',
+            circleBg: 'rgba(219,225,255,0.7)',
+            iconColor: BrandColors.tertiary,
+            onPress: () => handleMenuClick('Tarif'),
+          },
+        ],
+      },
+    ];
+  })();
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
@@ -207,7 +531,13 @@ export default function BerandaScreen() {
             <View style={styles.urgentChip}>
               <MaterialIcons name="notification-important" size={13} color="#ffffff" />
               <Text style={styles.urgentChipText}>
-                {pendingCount || (summary ? summary.cars_not_ready : 0)} Unit Butuh Alokasi
+                {isAdmin
+                  ? `${pendingCount || (summary ? summary.cars_not_ready : 0)} Unit Butuh Alokasi`
+                  : isMarketing
+                    ? `${pendingCount || 0} Booking Baru`
+                    : isPeluncur
+                      ? `${pendingCount || 0} Tugas Serah/Kembali`
+                      : `${pendingCount || 0} Tugas Aktif`}
               </Text>
             </View>
 
@@ -220,59 +550,6 @@ export default function BerandaScreen() {
           </View>
         </LinearGradient>
 
-        {/* 3. Metric Summary Cards (Real Stats from Laravel API) */}
-        <View style={styles.metricsGrid}>
-          {/* Card 1: Armada Aktif */}
-          <View style={styles.metricCard}>
-            <View style={[styles.metricIconWrap, { backgroundColor: BrandColors.primaryFixed }]}>
-              <MaterialIcons name="directions-car" size={18} color={BrandColors.primary} />
-            </View>
-            <View>
-              <Text style={styles.metricLabel}>ARMADA AKTIF</Text>
-              <View style={styles.metricValueRow}>
-                <Text style={styles.metricValueBold}>
-                  {summary ? summary.cars_ready : 0}
-                </Text>
-                <Text style={styles.metricValueTotal}>
-                  / {summary ? summary.total_cars : 0}
-                </Text>
-              </View>
-            </View>
-          </View>
-
-          {/* Card 2: Booking Baru */}
-          <View style={styles.metricCard}>
-            <View style={[styles.metricIconWrap, { backgroundColor: BrandColors.secondaryFixed }]}>
-              <MaterialIcons name="calendar-today" size={18} color={BrandColors.secondary} />
-            </View>
-            <View>
-              <Text style={styles.metricLabel}>BOOKING BARU</Text>
-              <View style={styles.metricValueRow}>
-                <Text style={styles.metricValueBold}>
-                  {pendingCount}
-                </Text>
-                <Text style={styles.metricValueBadge}>Booking</Text>
-              </View>
-            </View>
-          </View>
-
-          {/* Card 3: Unit Kembali */}
-          <View style={styles.metricCard}>
-            <View style={[styles.metricIconWrap, { backgroundColor: BrandColors.surfaceContainerHigh }]}>
-              <MaterialIcons name="assignment-return" size={18} color={BrandColors.tertiary} />
-            </View>
-            <View>
-              <Text style={styles.metricLabel}>UNIT KEMBALI</Text>
-              <View style={styles.metricValueRow}>
-                <Text style={styles.metricValueBold}>
-                  {summary ? (summary.overdue_returns ?? 0) : 0}
-                </Text>
-                <Text style={styles.metricValueSub}>Hari Ini</Text>
-              </View>
-            </View>
-          </View>
-        </View>
-
         {/* 4. Menu Operasional */}
         <View style={styles.sectionContainer}>
           <View style={styles.sectionHeader}>
@@ -280,149 +557,41 @@ export default function BerandaScreen() {
               <View style={[styles.titleBar, { backgroundColor: BrandColors.primary }]} />
               <Text style={styles.sectionTitle}>Menu Operasional</Text>
             </View>
-            <TouchableOpacity onPress={() => handleMenuClick('Kustomisasi')}>
-              <Text style={styles.sectionActionText}>Kustomisasi</Text>
-            </TouchableOpacity>
           </View>
 
           <View style={styles.menuContainerCard}>
-            {/* Group 1: Layanan Utama */}
-            <View style={styles.menuGroup}>
-              <Text style={styles.menuGroupTitle}>Layanan Utama</Text>
-              <View style={styles.menuGrid}>
-                <TouchableOpacity
-                  style={styles.menuItem}
-                  onPress={() => handleMenuClick('Booking')}
-                  activeOpacity={0.7}>
-                  <View style={[styles.menuIconCircle, { backgroundColor: 'rgba(204,229,255,0.7)' }]}>
-                    <MaterialIcons name="calendar-month" size={22} color={BrandColors.primary} />
-                  </View>
-                  <Text style={styles.menuItemText}>Booking</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.menuItem}
-                  onPress={() => handleMenuClick('Alokasi')}
-                  activeOpacity={0.7}>
-                  <View style={[styles.menuIconCircle, { backgroundColor: 'rgba(255,221,184,0.6)' }]}>
-                    <MaterialIcons name="vpn-key" size={22} color={BrandColors.secondary} />
-                  </View>
-                  <Text style={styles.menuItemText}>Alokasi</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.menuItem}
-                  onPress={() => handleMenuClick('Serah Unit')}
-                  activeOpacity={0.7}>
-                  <View style={[styles.menuIconCircle, { backgroundColor: 'rgba(219,225,255,0.7)' }]}>
-                    <MaterialIcons name="handshake" size={22} color={BrandColors.tertiary} />
-                  </View>
-                  <Text style={styles.menuItemText}>Serah Unit</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.menuItem}
-                  onPress={() => handleMenuClick('Kembali')}
-                  activeOpacity={0.7}>
-                  <View style={[styles.menuIconCircle, { backgroundColor: BrandColors.surfaceContainerHigh }]}>
-                    <MaterialIcons name="swap-horizontal-circle" size={22} color={BrandColors.primary} />
-                  </View>
-                  <Text style={styles.menuItemText}>Kembali</Text>
-                </TouchableOpacity>
+            {menuGroups.map((group, groupIdx) => (
+              <View
+                key={group.title}
+                style={groupIdx === 0 ? styles.menuGroup : styles.menuGroupBordered}>
+                <Text style={styles.menuGroupTitle}>{group.title}</Text>
+                <View style={styles.menuGrid}>
+                  {group.items.map((item) => (
+                    <TouchableOpacity
+                      key={item.id}
+                      style={styles.menuItem}
+                      onPress={item.onPress}
+                      activeOpacity={0.7}>
+                      <View
+                        style={
+                          item.circleBg
+                            ? [styles.menuIconCircle, { backgroundColor: item.circleBg }]
+                            : styles.menuIconCircleNeutral
+                        }>
+                        <MaterialIcons
+                          name={item.icon}
+                          size={22}
+                          color={item.iconColor || BrandColors.onSurfaceVariant}
+                        />
+                      </View>
+                      <Text style={styles.menuItemText} numberOfLines={1}>
+                        {item.title}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
               </View>
-            </View>
-
-            {/* Group 2: Manajemen & Finansial */}
-            <View style={styles.menuGroupBordered}>
-              <Text style={styles.menuGroupTitle}>Manajemen &amp; Finansial</Text>
-              <View style={styles.menuGrid}>
-                <TouchableOpacity
-                  style={styles.menuItem}
-                  onPress={() => handleMenuClick('Data Mobil')}
-                  activeOpacity={0.7}>
-                  <View style={styles.menuIconCircleNeutral}>
-                    <MaterialIcons name="directions-car" size={22} color={BrandColors.onSurfaceVariant} />
-                  </View>
-                  <Text style={styles.menuItemText}>Data Mobil</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.menuItem}
-                  onPress={() => handleMenuClick('Bayar')}
-                  activeOpacity={0.7}>
-                  <View style={styles.menuIconCircleNeutral}>
-                    <MaterialIcons name="payments" size={22} color={BrandColors.onSurfaceVariant} />
-                  </View>
-                  <Text style={styles.menuItemText}>Bayar</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.menuItem}
-                  onPress={() => handleMenuClick('Servis')}
-                  activeOpacity={0.7}>
-                  <View style={styles.menuIconCircleNeutral}>
-                    <MaterialIcons name="car-repair" size={22} color={BrandColors.onSurfaceVariant} />
-                  </View>
-                  <Text style={styles.menuItemText}>Servis</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.menuItem}
-                  onPress={() => handleMenuClick('Sopir')}
-                  activeOpacity={0.7}>
-                  <View style={styles.menuIconCircleNeutral}>
-                    <MaterialIcons name="badge" size={22} color={BrandColors.onSurfaceVariant} />
-                  </View>
-                  <Text style={styles.menuItemText}>Sopir</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {/* Group 3: Proteksi & Laporan */}
-            <View style={styles.menuGroupBordered}>
-              <Text style={styles.menuGroupTitle}>Proteksi &amp; Laporan</Text>
-              <View style={styles.menuGrid}>
-                <TouchableOpacity
-                  style={styles.menuItem}
-                  onPress={() => handleMenuClick('Asuransi')}
-                  activeOpacity={0.7}>
-                  <View style={styles.menuIconCircleNeutral}>
-                    <MaterialIcons name="shield" size={22} color={BrandColors.onSurfaceVariant} />
-                  </View>
-                  <Text style={styles.menuItemText}>Asuransi</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.menuItem}
-                  onPress={() => handleMenuClick('Laporan')}
-                  activeOpacity={0.7}>
-                  <View style={styles.menuIconCircleNeutral}>
-                    <MaterialIcons name="query-stats" size={22} color={BrandColors.onSurfaceVariant} />
-                  </View>
-                  <Text style={styles.menuItemText}>Laporan</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.menuItem}
-                  onPress={() => handleMenuClick('Tarif')}
-                  activeOpacity={0.7}>
-                  <View style={styles.menuIconCircleNeutral}>
-                    <MaterialIcons name="style" size={22} color={BrandColors.onSurfaceVariant} />
-                  </View>
-                  <Text style={styles.menuItemText}>Tarif</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.menuItem}
-                  onPress={() => handleMenuClick('Lainnya')}
-                  activeOpacity={0.7}>
-                  <View style={styles.menuIconCircleNeutral}>
-                    <MaterialIcons name="grid-view" size={22} color={BrandColors.onSurfaceVariant} />
-                  </View>
-                  <Text style={styles.menuItemText}>Lainnya</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
+            ))}
           </View>
         </View>
 
@@ -498,7 +667,7 @@ export default function BerandaScreen() {
                   <View style={styles.bookingActionsRow}>
                     <TouchableOpacity
                       style={styles.primaryActionButton}
-                      onPress={() => handleMenuClick(`Kelola Booking #${item.id}`)}
+                      onPress={() => router.push({ pathname: '/booking-detail' as any, params: { id: String(item.id) } })}
                       activeOpacity={0.85}>
                       <Text style={styles.primaryActionText}>
                         {item.status.toLowerCase().includes('pending')
@@ -510,7 +679,7 @@ export default function BerandaScreen() {
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={styles.secondaryActionButton}
-                      onPress={() => handleMenuClick(`Detail Booking #${item.id}`)}
+                      onPress={() => router.push({ pathname: '/booking-detail' as any, params: { id: String(item.id) } })}
                       activeOpacity={0.75}>
                       <Text style={styles.secondaryActionText}>Detail</Text>
                     </TouchableOpacity>
@@ -1031,11 +1200,12 @@ const styles = StyleSheet.create({
   },
   menuGrid: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-start',
   },
   menuItem: {
+    width: '25%',
     alignItems: 'center',
-    flex: 1,
     paddingVertical: 6,
   },
   menuIconCircle: {
