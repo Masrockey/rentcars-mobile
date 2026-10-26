@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "rentcars-mobile",
+    "name": "CAN Rentcars App",
     "slug": "cdk-project",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -11,11 +11,12 @@
       "icon": "./assets/expo.icon"
     },
     "android": {
+      "package": "com.citradinamika.rentcarsmobile",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "backgroundColor": "#FFFFFF",
+        "foregroundImage": "./assets/images/logo.png",
+        "backgroundImage": "./assets/images/logo.png",
+        "monochromeImage": "./assets/images/logo.png"
       },
       "predictiveBackGestureEnabled": false
     },

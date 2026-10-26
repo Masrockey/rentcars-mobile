@@ -40,7 +40,7 @@ Dokumentasi resmi REST API versi 1 (`/api/v1`) untuk **Rent Car System**. API in
 
 | Lingkungan | Base URL |
 | :--- | :--- |
-| **Production (Live)** | `https://rent.cdk-project.web.id/api/v1` |
+| **Production (Live)** | `` |
 | **Lokal (Development)** | `http://localhost:8000/api/v1` |
 
 ### Header Permintaan Wajib (HTTP Headers)
