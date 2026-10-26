@@ -4,11 +4,15 @@
     "slug": "cdk-project",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/logo.png",
     "scheme": "rentcarsmobile",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/images/logo.png",
+      "bundleIdentifier": "com.citradinamika.rentcarsmobile",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.citradinamika.rentcarsmobile",

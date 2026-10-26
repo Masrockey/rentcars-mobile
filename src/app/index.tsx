@@ -237,14 +237,6 @@ export default function LoginScreen() {
                 <MaterialIcons name="fingerprint" size={18} color={BrandColors.primary} />
                 <Text style={styles.biometricText}>Masuk Cepat via Biometrik</Text>
               </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.demoSplashBtn}
-                onPress={() => router.push('/splash' as any)}
-                activeOpacity={0.75}>
-                <MaterialIcons name="auto-awesome" size={16} color={BrandColors.secondary} />
-                <Text style={styles.demoSplashText}>Lihat Demo Splash &amp; Loading</Text>
-              </TouchableOpacity>
             </View>
           </View>
 
@@ -512,20 +504,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: BrandColors.primary,
   },
-  demoSplashBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 10,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-  },
-  demoSplashText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: BrandColors.secondary,
-  },
-
   /* Footer */
   footerContainer: {
     alignItems: 'center',
