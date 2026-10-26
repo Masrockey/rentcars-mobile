@@ -18,23 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { BrandColors } from '@/constants/brand';
 import { BookingService, CreateBookingPayload, Customer, LookupsData, MarketingUser } from '@/services/booking';
 import { StorageService, UserProfile } from '@/services/storage';
-
-const MONTH_NAMES = [
-  'Januari',
-  'Februari',
-  'Maret',
-  'April',
-  'Mei',
-  'Juni',
-  'Juli',
-  'Agustus',
-  'September',
-  'Oktober',
-  'November',
-  'Desember',
-];
-
-const DAY_NAMES = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
+import { CalendarPickerModal } from '@/components/CalendarPickerModal';
 
 const PRESET_TIMES = [
   '06:00',
@@ -116,39 +100,13 @@ export default function BookingCreateScreen() {
   // Date & Time Picker Modal states
   const [dateModalVisible, setDateModalVisible] = useState(false);
   const [dateTarget, setDateTarget] = useState<'start' | 'end'>('start');
-  const [calYear, setCalYear] = useState(() => new Date().getFullYear());
-  const [calMonth, setCalMonth] = useState(() => new Date().getMonth());
 
   const [timeModalVisible, setTimeModalVisible] = useState(false);
   const [timeTarget, setTimeTarget] = useState<'pickup' | 'return'>('pickup');
   const [customTimeInput, setCustomTimeInput] = useState('');
 
-  // Helper Date calculations
-  const parseDateParts = (str: string) => {
-    const parts = (str || '').split('/');
-    if (parts.length === 3) {
-      const d = parseInt(parts[0], 10);
-      const m = parseInt(parts[1], 10) - 1;
-      const y = parseInt(parts[2], 10);
-      if (!isNaN(d) && !isNaN(m) && !isNaN(y)) {
-        return new Date(y, m, d);
-      }
-    }
-    return new Date();
-  };
-
-  const formatDateToString = (d: Date) => {
-    const day = String(d.getDate()).padStart(2, '0');
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const year = d.getFullYear();
-    return `${day}/${month}/${year}`;
-  };
-
   const openDatePicker = (target: 'start' | 'end') => {
     setDateTarget(target);
-    const activeDate = parseDateParts(target === 'start' ? startDate : endDate);
-    setCalYear(activeDate.getFullYear());
-    setCalMonth(activeDate.getMonth());
     setDateModalVisible(true);
   };
 
@@ -158,16 +116,33 @@ export default function BookingCreateScreen() {
     setTimeModalVisible(true);
   };
 
-  const handleSelectDate = (day: number) => {
-    const selected = new Date(calYear, calMonth, day);
-    const dateStr = formatDateToString(selected);
-
+  const handleSelectDate = (dateStr: string) => {
+    let s = startDate;
+    let e = endDate;
     if (dateTarget === 'start') {
+      s = dateStr;
       setStartDate(dateStr);
     } else {
+      e = dateStr;
       setEndDate(dateStr);
     }
-    setDateModalVisible(false);
+
+    // Hitung estimasi durasi sewa jika kedua tanggal sudah terisi
+    if (s && e) {
+      const sIso = toISODate(s);
+      const eIso = toISODate(e);
+      if (sIso && eIso) {
+        const sTime = new Date(sIso).getTime();
+        const eTime = new Date(eIso).getTime();
+        const diffDays = Math.round((eTime - sTime) / (1000 * 60 * 60 * 24));
+        if (diffDays === 0) {
+          // Tanggal sama = sewa harian (1 hari)
+          setDurationDays(1);
+        } else if (diffDays > 0) {
+          setDurationDays(diffDays);
+        }
+      }
+    }
   };
 
   const handleSelectTime = (timeStr: string) => {
@@ -371,10 +346,10 @@ export default function BookingCreateScreen() {
       const startIso = toISODate(startDate);
       const endIso = toISODate(endDate);
 
-      if (endIso <= startIso) {
+      if (endIso < startIso) {
         Alert.alert(
           'Perhatian',
-          'Tanggal Balik harus setelah Tanggal Sewa.'
+          'Tanggal Balik tidak boleh sebelum Tanggal Sewa.'
         );
         setSubmitting(false);
         return;
@@ -1558,161 +1533,14 @@ export default function BookingCreateScreen() {
       </Modal>
 
       {/* Date Picker Modal (Kalender Interaktif) */}
-      <Modal
+      <CalendarPickerModal
         visible={dateModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setDateModalVisible(false)}>
-        <View style={styles.modalOverlayCenter}>
-          <View style={styles.calendarModalContent}>
-            {/* Modal Header */}
-            <View style={styles.modalHeader}>
-              <View>
-                <Text style={styles.modalTitle}>
-                  {dateTarget === 'start' ? 'Pilih Tanggal Sewa' : 'Pilih Tanggal Balik'}
-                </Text>
-                <Text style={styles.calendarModalSubtitle}>
-                  Target: {dateTarget === 'start' ? 'Mulai Pengambilan Unit' : 'Jadwal Pengembalian Unit'}
-                </Text>
-              </View>
-              <TouchableOpacity onPress={() => setDateModalVisible(false)}>
-                <MaterialIcons name="close" size={22} color={BrandColors.onSurface} />
-              </TouchableOpacity>
-            </View>
-
-            {/* Month & Year Navigator */}
-            <View style={styles.calendarMonthNav}>
-              <TouchableOpacity
-                style={styles.navArrowBtn}
-                onPress={() => {
-                  if (calMonth === 0) {
-                    setCalMonth(11);
-                    setCalYear((prev) => prev - 1);
-                  } else {
-                    setCalMonth((prev) => prev - 1);
-                  }
-                }}>
-                <MaterialIcons name="chevron-left" size={24} color={BrandColors.onSurface} />
-              </TouchableOpacity>
-
-              <Text style={styles.calendarMonthTitle}>
-                {MONTH_NAMES[calMonth]} {calYear}
-              </Text>
-
-              <TouchableOpacity
-                style={styles.navArrowBtn}
-                onPress={() => {
-                  if (calMonth === 11) {
-                    setCalMonth(0);
-                    setCalYear((prev) => prev + 1);
-                  } else {
-                    setCalMonth((prev) => prev + 1);
-                  }
-                }}>
-                <MaterialIcons name="chevron-right" size={24} color={BrandColors.onSurface} />
-              </TouchableOpacity>
-            </View>
-
-            {/* Day Names Header */}
-            <View style={styles.dayNamesRow}>
-              {DAY_NAMES.map((name, idx) => (
-                <Text
-                  key={name}
-                  style={[
-                    styles.dayNameText,
-                    idx === 0 ? styles.sundayText : null,
-                  ]}>
-                  {name}
-                </Text>
-              ))}
-            </View>
-
-            {/* Calendar Days Grid */}
-            <View style={styles.daysGrid}>
-              {(() => {
-                const firstDayIndex = new Date(calYear, calMonth, 1).getDay();
-                const totalDaysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
-                const cells = [];
-
-                // Empty cells before day 1
-                for (let i = 0; i < firstDayIndex; i++) {
-                  cells.push(<View key={`empty-${i}`} style={styles.dayCellEmpty} />);
-                }
-
-                const currentSelectedStr = dateTarget === 'start' ? startDate : endDate;
-                const hasSelectedDate = Boolean(currentSelectedStr && currentSelectedStr.trim());
-                const activeParsed = parseDateParts(currentSelectedStr);
-                const isCurrentMonthAndYear =
-                  hasSelectedDate &&
-                  activeParsed.getFullYear() === calYear &&
-                  activeParsed.getMonth() === calMonth;
-                const activeDayNum = isCurrentMonthAndYear ? activeParsed.getDate() : -1;
-
-                const today = new Date();
-                const isThisMonth = today.getFullYear() === calYear && today.getMonth() === calMonth;
-                const todayDate = isThisMonth ? today.getDate() : -1;
-
-                // Day cells
-                for (let day = 1; day <= totalDaysInMonth; day++) {
-                  const isSelected = day === activeDayNum;
-                  const isToday = day === todayDate;
-
-                  cells.push(
-                    <TouchableOpacity
-                      key={`day-${day}`}
-                      style={[
-                        styles.dayCell,
-                        isSelected ? styles.dayCellSelected : null,
-                        !isSelected && isToday ? styles.dayCellToday : null,
-                      ]}
-                      activeOpacity={0.7}
-                      onPress={() => handleSelectDate(day)}>
-                      <Text
-                        style={[
-                          styles.dayCellText,
-                          isSelected ? styles.dayCellTextSelected : null,
-                          !isSelected && isToday ? styles.dayCellTextToday : null,
-                        ]}>
-                        {day}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                }
-
-                return cells;
-              })()}
-            </View>
-
-            {/* Quick Actions (Hari Ini & Besok) */}
-            <View style={styles.calendarQuickActions}>
-              <TouchableOpacity
-                style={styles.quickActionBtn}
-                onPress={() => {
-                  const now = new Date();
-                  setCalYear(now.getFullYear());
-                  setCalMonth(now.getMonth());
-                  handleSelectDate(now.getDate());
-                }}>
-                <MaterialIcons name="today" size={14} color={BrandColors.primary} />
-                <Text style={styles.quickActionBtnText}>Hari Ini</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.quickActionBtn}
-                onPress={() => {
-                  const tomorrow = new Date();
-                  tomorrow.setDate(tomorrow.getDate() + 1);
-                  setCalYear(tomorrow.getFullYear());
-                  setCalMonth(tomorrow.getMonth());
-                  handleSelectDate(tomorrow.getDate());
-                }}>
-                <MaterialIcons name="fast-forward" size={14} color={BrandColors.primary} />
-                <Text style={styles.quickActionBtnText}>Besok</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+        onClose={() => setDateModalVisible(false)}
+        selectedDate={dateTarget === 'start' ? startDate : endDate}
+        onSelectDate={handleSelectDate}
+        title={dateTarget === 'start' ? 'Pilih Tanggal Sewa' : 'Pilih Tanggal Balik'}
+        subtitle={dateTarget === 'start' ? 'Target: Mulai Pengambilan Unit' : 'Target: Jadwal Pengembalian Unit'}
+      />
 
       {/* Time Picker Modal (Pilihan Jam) */}
       <Modal

@@ -12,6 +12,14 @@ export interface DeliveryPayload {
   checkout_time?: string;
   checkout_datetime?: string;
   checklist: Record<string, any>;
+  photos?: string[];
+  ktp_photos?: string[];
+  sim_photos?: string[];
+  body_depan_photos?: string[];
+  body_kiri_photos?: string[];
+  body_kanan_photos?: string[];
+  body_belakang_photos?: string[];
+  body_atap_photos?: string[];
 }
 
 export interface ReturnPayload {
@@ -21,6 +29,12 @@ export interface ReturnPayload {
   handover_location?: string;
   notes?: string;
   checklist: Record<string, any>;
+  photos?: string[];
+  body_depan_photos?: string[];
+  body_kiri_photos?: string[];
+  body_kanan_photos?: string[];
+  body_belakang_photos?: string[];
+  body_atap_photos?: string[];
 }
 
 export interface DeliveryListResponse {
@@ -52,6 +66,47 @@ const getEndpointUrl = (endpoint: string) => {
   }
   return `${base}/${cleanEndpoint}`;
 };
+
+/**
+ * Helper untuk mengirim multipart/form-data menggunakan XMLHttpRequest native React Native
+ * Menghindari bug Expo SDK 52 fetch "Unsupported FormDataPart implementation"
+ */
+function sendMultipartRequest(url: string, token: string, formData: FormData): Promise<any> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', url);
+    xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+    xhr.setRequestHeader('Accept', 'application/json');
+    // JANGAN set Content-Type, biarkan React Native native networking mengatur boundary multipart
+
+    xhr.onload = () => {
+      let json: any = {};
+      try {
+        json = JSON.parse(xhr.responseText);
+      } catch {
+        json = { message: xhr.responseText || 'Gagal memproses respon server.' };
+      }
+
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(json);
+      } else {
+        reject(new Error(json.message || `Server error (${xhr.status})`));
+      }
+    };
+
+    xhr.onerror = (e) => {
+      console.error('[XHR NETWORK ERROR]:', e);
+      reject(new Error('Gagal terhubung ke server saat mengunggah formulir. Pastikan jaringan aktif.'));
+    };
+
+    xhr.ontimeout = () => {
+      reject(new Error('Waktu permintaan habis (timeout) saat mengunggah foto. Silakan coba lagi.'));
+    };
+
+    xhr.timeout = 120000; // 120 detik
+    xhr.send(formData);
+  });
+}
 
 export const DeliveryReturnService = {
   /**
@@ -144,19 +199,81 @@ export const DeliveryReturnService = {
       const token = await StorageService.getToken();
       if (!token) throw new Error('Sesi telah berakhir. Silakan login kembali.');
 
-      const res = await fetch(getEndpointUrl(`bookings/${bookingId}/delivery`), {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-        },
-        body: JSON.stringify(payload),
-      });
+      const hasFiles =
+        (payload.photos && payload.photos.length > 0) ||
+        (payload.ktp_photos && payload.ktp_photos.length > 0) ||
+        (payload.sim_photos && payload.sim_photos.length > 0) ||
+        (payload.body_depan_photos && payload.body_depan_photos.length > 0) ||
+        (payload.body_kiri_photos && payload.body_kiri_photos.length > 0) ||
+        (payload.body_kanan_photos && payload.body_kanan_photos.length > 0) ||
+        (payload.body_belakang_photos && payload.body_belakang_photos.length > 0) ||
+        (payload.body_atap_photos && payload.body_atap_photos.length > 0);
 
-      const json = await res.json();
-      if (!res.ok) {
-        throw new Error(json.message || 'Gagal menyimpan serah terima unit.');
+      let json: any;
+
+      if (hasFiles) {
+        const formData = new FormData();
+        formData.append('km_out', String(payload.km_out));
+        formData.append('fuel_out', String(payload.fuel_out));
+        if (payload.fuel_range_km !== undefined) formData.append('fuel_range_km', String(payload.fuel_range_km));
+        if (payload.handover_location) formData.append('handover_location', payload.handover_location);
+        if (payload.notes) formData.append('notes', payload.notes);
+        if (payload.checkout_date) formData.append('checkout_date', payload.checkout_date);
+        if (payload.checkout_time) formData.append('checkout_time', payload.checkout_time);
+        if (payload.checkout_datetime) formData.append('checkout_datetime', payload.checkout_datetime);
+
+        Object.entries(payload.checklist || {}).forEach(([k, v]) => {
+          if (typeof v === 'object' && v !== null) {
+            formData.append(`checklist[${k}]`, JSON.stringify(v));
+          } else {
+            formData.append(`checklist[${k}]`, String(v));
+          }
+        });
+
+        const appendFileGroup = (field: string, list?: string[]) => {
+          if (!list || list.length === 0) return;
+          list.forEach((uri, idx) => {
+            if (!uri) return;
+            // Jika sudah berupa URL online remote
+            if (uri.startsWith('http://') || uri.startsWith('https://')) {
+              formData.append(`${field}_urls[]`, uri);
+              return;
+            }
+            const filename = uri.split('/').pop() || `${field}_${idx}.jpg`;
+            const extMatch = /\.(\w+)$/.exec(filename);
+            const mime = extMatch ? `image/${extMatch[1].toLowerCase()}` : 'image/jpeg';
+            formData.append(`${field}[]`, {
+              uri,
+              name: filename,
+              type: mime,
+            } as any);
+          });
+        };
+
+        appendFileGroup('photos', payload.photos);
+        appendFileGroup('ktp_photos', payload.ktp_photos);
+        appendFileGroup('sim_photos', payload.sim_photos);
+        appendFileGroup('body_depan_photos', payload.body_depan_photos);
+        appendFileGroup('body_kiri_photos', payload.body_kiri_photos);
+        appendFileGroup('body_kanan_photos', payload.body_kanan_photos);
+        appendFileGroup('body_belakang_photos', payload.body_belakang_photos);
+        appendFileGroup('body_atap_photos', payload.body_atap_photos);
+
+        json = await sendMultipartRequest(getEndpointUrl(`bookings/${bookingId}/delivery`), token, formData);
+      } else {
+        const res = await fetch(getEndpointUrl(`bookings/${bookingId}/delivery`), {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+          },
+          body: JSON.stringify(payload),
+        });
+        json = await res.json();
+        if (!res.ok) {
+          throw new Error(json.message || 'Gagal menyimpan serah terima unit.');
+        }
       }
 
       return {
@@ -262,19 +379,73 @@ export const DeliveryReturnService = {
       const token = await StorageService.getToken();
       if (!token) throw new Error('Sesi telah berakhir. Silakan login kembali.');
 
-      const res = await fetch(getEndpointUrl(`bookings/${bookingId}/return`), {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-        },
-        body: JSON.stringify(payload),
-      });
+      const hasFiles =
+        (payload.photos && payload.photos.length > 0) ||
+        (payload.body_depan_photos && payload.body_depan_photos.length > 0) ||
+        (payload.body_kiri_photos && payload.body_kiri_photos.length > 0) ||
+        (payload.body_kanan_photos && payload.body_kanan_photos.length > 0) ||
+        (payload.body_belakang_photos && payload.body_belakang_photos.length > 0) ||
+        (payload.body_atap_photos && payload.body_atap_photos.length > 0);
 
-      const json = await res.json();
-      if (!res.ok) {
-        throw new Error(json.message || 'Gagal memproses pengembalian unit.');
+      let json: any;
+
+      if (hasFiles) {
+        const formData = new FormData();
+        formData.append('km_out', String(payload.km_out));
+        formData.append('fuel_out', String(payload.fuel_out));
+        if (payload.fuel_range_km !== undefined) formData.append('fuel_range_km', String(payload.fuel_range_km));
+        if (payload.handover_location) formData.append('handover_location', payload.handover_location);
+        if (payload.notes) formData.append('notes', payload.notes);
+
+        Object.entries(payload.checklist || {}).forEach(([k, v]) => {
+          if (typeof v === 'object' && v !== null) {
+            formData.append(`checklist[${k}]`, JSON.stringify(v));
+          } else {
+            formData.append(`checklist[${k}]`, String(v));
+          }
+        });
+
+        const appendFileGroup = (field: string, list?: string[]) => {
+          if (!list || list.length === 0) return;
+          list.forEach((uri, idx) => {
+            if (!uri) return;
+            if (uri.startsWith('http://') || uri.startsWith('https://')) {
+              formData.append(`${field}_urls[]`, uri);
+              return;
+            }
+            const filename = uri.split('/').pop() || `${field}_${idx}.jpg`;
+            const extMatch = /\.(\w+)$/.exec(filename);
+            const mime = extMatch ? `image/${extMatch[1].toLowerCase()}` : 'image/jpeg';
+            formData.append(`${field}[]`, {
+              uri,
+              name: filename,
+              type: mime,
+            } as any);
+          });
+        };
+
+        appendFileGroup('photos', payload.photos);
+        appendFileGroup('body_depan_photos', payload.body_depan_photos);
+        appendFileGroup('body_kiri_photos', payload.body_kiri_photos);
+        appendFileGroup('body_kanan_photos', payload.body_kanan_photos);
+        appendFileGroup('body_belakang_photos', payload.body_belakang_photos);
+        appendFileGroup('body_atap_photos', payload.body_atap_photos);
+
+        json = await sendMultipartRequest(getEndpointUrl(`bookings/${bookingId}/return`), token, formData);
+      } else {
+        const res = await fetch(getEndpointUrl(`bookings/${bookingId}/return`), {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+          },
+          body: JSON.stringify(payload),
+        });
+        json = await res.json();
+        if (!res.ok) {
+          throw new Error(json.message || 'Gagal memproses pengembalian unit.');
+        }
       }
 
       return {
@@ -291,3 +462,4 @@ export const DeliveryReturnService = {
     }
   },
 };
+

@@ -181,7 +181,7 @@ export default function BookingDetailScreen() {
   const dpAmount = booking?.dp_amount || 1500000;
   const remainingAmount = Math.max(0, totalAmount - dpAmount);
 
-  const pickupLocation = booking?.pickup_location || 'Pool Sudirman (Kantor Pusat PT. CAN)';
+  const pickupLocation = booking?.pickup_location || '-';
   const dropoffLocation = booking?.dropoff_location || 'Bandara Kualanamu (Drop-off Terminal)';
   const startDate = booking?.booking_date || 'Sabtu, 24 Okt 2026';
   const endDate = booking?.return_date || 'Selasa, 27 Okt 2026';
@@ -407,7 +407,7 @@ export default function BookingDetailScreen() {
             <View style={styles.innerGrayBox}>
               <View style={styles.recommendationTop}>
                 <Text style={styles.recommendationLabel}>
-                  REKOMENDASI TERDEKAT (POOL SUDIRMAN)
+                  REKOMENDASI TERDEKAT
                 </Text>
                 <View style={styles.readyTag}>
                   <Text style={styles.readyTagText}>Siap Pakai</Text>

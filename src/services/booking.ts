@@ -10,6 +10,8 @@ export interface Customer {
   address?: string | null;
   email?: string | null;
   is_verified?: boolean;
+  ktp_photo_url?: string | null;
+  sim_photo_url?: string | null;
 }
 
 export interface Car {

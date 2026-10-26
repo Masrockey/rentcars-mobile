@@ -1,35 +1,47 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  FlatList,
-  TextInput,
-  ActivityIndicator,
-  RefreshControl,
-  ScrollView,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  Image,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { MaterialIcons } from '@expo/vector-icons';
-import { useRouter, useLocalSearchParams } from 'expo-router';
-import Svg, { Path, Rect, Circle, Line, Text as SvgText } from 'react-native-svg';
+import { BookingInfoCard } from '@/components/BookingInfoCard';
+import { CalendarPickerModal } from '@/components/CalendarPickerModal';
+import { FuelIndicatorCard } from '@/components/FuelIndicatorCard';
 import { BrandColors } from '@/constants/brand';
 import { BookingDetail } from '@/services/booking';
 import { DeliveryReturnService, ReturnPayload } from '@/services/deliveryReturn';
+import { MaterialIcons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
+import * as Location from 'expo-location';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Image,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import Svg, { Circle, Path, Rect } from 'react-native-svg';
 
 type BodySide = 'depan' | 'kiri' | 'kanan' | 'belakang' | 'atap';
-type BodyCondition = 'baik' | 'baret' | 'penyok' | 'rusak';
+type BodyCondition = 'baik' | 'baret' | 'penyok' | 'rusak' | '';
 
 interface SideData {
   title: string;
   condition: BodyCondition;
   note: string;
 }
+
+const PRESET_TIMES = [
+  '07:00', '08:00', '09:00', '10:00', '11:00', '12:00',
+  '13:00', '14:00', '15:00', '16:00', '17:00', '18:00',
+  '19:00', '20:00', '21:00', '22:00',
+];
 
 export default function ReturnScreen() {
   const router = useRouter();
@@ -53,24 +65,41 @@ export default function ReturnScreen() {
   // Form States (Sesuai Desain Prototype)
   const [kmIn, setKmIn] = useState('14380');
   const [initialKm, setInitialKm] = useState('14250');
-  const [checkinTime, setCheckinTime] = useState('16:45 WIB');
+  const [checkinTime, setCheckinTime] = useState('16:45');
   const [checkinDate, setCheckinDate] = useState('27/10/2026');
-  const [returnLocation, setReturnLocation] = useState('Pool Sudirman (Kantor Pusat PT. CAN)');
+  const [returnLocation, setReturnLocation] = useState('');
   const [gpsLocked, setGpsLocked] = useState(false);
-  const [gpsCoord, setGpsCoord] = useState('Lat -6.1754, Long 106.8272');
+  const [gpsCoord, setGpsCoord] = useState('Menunggu Kunci GPS');
+  const [gpsLoading, setGpsLoading] = useState(false);
   const [fuelPercent, setFuelPercent] = useState<number>(40);
-  const [generalNotes, setGeneralNotes] = useState('Unit kembali dalam keadaan baik. Bahan bakar stabil pada level 40%. Tidak ditemukan kendala elektrikal maupun bodi tambahan.');
+  const [fuelRangeKm, setFuelRangeKm] = useState('112');
+  const [generalNotes, setGeneralNotes] = useState('');
+
+  // Modal Date & Time Picker States
+  const [dateModalVisible, setDateModalVisible] = useState(false);
+  const [timeModalVisible, setTimeModalVisible] = useState(false);
+  const [customTimeInput, setCustomTimeInput] = useState('');
+
+  // Photo States
+  const [unitPhotos, setUnitPhotos] = useState<string[]>([]);
+  const [sidePhotos, setSidePhotos] = useState<Record<BodySide, string[]>>({
+    depan: [],
+    kiri: [],
+    kanan: [],
+    belakang: [],
+    atap: [],
+  });
 
   // Checklist 8 Item Kembali
-  const [checklists, setChecklists] = useState<Record<string, boolean>>({
-    kunci_kontak: true,
-    stnk_asli: true,
-    ban_serep: true,
-    dongkrak_kit: true,
-    kunci_roda: true,
-    stang_dongkrak: true,
-    ac_mobil: true,
-    audio_system: true,
+  const [checklists, setChecklists] = useState<Record<string, boolean | null>>({
+    kunci_kontak: null,
+    stnk_asli: null,
+    ban_serep: null,
+    dongkrak_kit: null,
+    kunci_roda: null,
+    stang_dongkrak: null,
+    ac_mobil: null,
+    audio_system: null,
   });
 
   // Inspeksi 5 Sisi Bodi Saat Kembali
@@ -78,28 +107,28 @@ export default function ReturnScreen() {
   const [bodySides, setBodySides] = useState<Record<BodySide, SideData>>({
     depan: {
       title: 'Tampak Depan',
-      condition: 'baik',
-      note: 'Kondisi bodi depan tetap mulus, lampu dan gril utuh.',
+      condition: '',
+      note: '',
     },
     kiri: {
       title: 'Samping Kiri',
-      condition: 'baret',
-      note: 'Baret lama terverifikasi, tidak ada lecet baru.',
+      condition: '',
+      note: '',
     },
     kanan: {
       title: 'Samping Kanan',
-      condition: 'baik',
-      note: 'Sisi samping kanan aman tanpa baret baru.',
+      condition: '',
+      note: '',
     },
     belakang: {
       title: 'Tampak Belakang',
-      condition: 'baret',
-      note: 'Baret lama pada bumper belakang terverifikasi.',
+      condition: '',
+      note: '',
     },
     atap: {
       title: 'Tampak Atas / Atap',
-      condition: 'baik',
-      note: 'Sunroof dan atap tetap mulus bersih.',
+      condition: '',
+      note: '',
     },
   });
 
@@ -108,15 +137,47 @@ export default function ReturnScreen() {
     const startKm = booking.rental?.km_out ?? booking.car?.last_km ?? 14250;
     setInitialKm(String(startKm));
     setKmIn(String(startKm + 130));
-    setReturnLocation(booking.dropoff_location || 'Pool Sudirman (Kantor Pusat PT. CAN)');
+    setReturnLocation(booking.dropoff_location || '');
 
     const now = new Date();
     const dStr = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
-    const tStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')} WIB`;
+    const tStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
     setCheckinDate(booking.return_date || dStr);
-    setCheckinTime(booking.return_time ? `${booking.return_time} WIB` : tStr);
-    setFuelPercent(booking.rental?.fuel_out ?? 43);
+    setCheckinTime(booking.return_time ? booking.return_time.replace(/\s*WIB/i, '').trim() : tStr);
+    const fPercent = booking.rental?.fuel_out ?? 43;
+    setFuelPercent(fPercent);
+    setFuelRangeKm(String(Math.round((fPercent / 100) * 280)));
     setGpsLocked(false);
+    setGpsCoord('Menunggu Kunci GPS');
+    setGpsLoading(false);
+
+    // Reset foto unit & sisi bodi
+    setUnitPhotos([]);
+    setSidePhotos({
+      depan: [],
+      kiri: [],
+      kanan: [],
+      belakang: [],
+      atap: [],
+    });
+    setChecklists({
+      kunci_kontak: null,
+      stnk_asli: null,
+      ban_serep: null,
+      dongkrak_kit: null,
+      kunci_roda: null,
+      stang_dongkrak: null,
+      ac_mobil: null,
+      audio_system: null,
+    });
+    setBodySides({
+      depan: { title: 'Tampak Depan', condition: '', note: '' },
+      kiri: { title: 'Samping Kiri', condition: '', note: '' },
+      kanan: { title: 'Samping Kanan', condition: '', note: '' },
+      belakang: { title: 'Tampak Belakang', condition: '', note: '' },
+      atap: { title: 'Tampak Atas / Atap', condition: '', note: '' },
+    });
+    setActiveSide('depan');
   }, []);
 
   // Load data list
@@ -162,24 +223,39 @@ export default function ReturnScreen() {
     loadData(true);
   };
 
-  // Toggle Semua OK
+  // Toggle Semua OK / Reset Default Null
   const handleToggleAllOk = () => {
-    setChecklists({
-      kunci_kontak: true,
-      stnk_asli: true,
-      ban_serep: true,
-      dongkrak_kit: true,
-      kunci_roda: true,
-      stang_dongkrak: true,
-      ac_mobil: true,
-      audio_system: true,
-    });
+    const isAllOk = Object.values(checklists).every((val) => val === true);
+    if (isAllOk) {
+      setChecklists({
+        kunci_kontak: null,
+        stnk_asli: null,
+        ban_serep: null,
+        dongkrak_kit: null,
+        kunci_roda: null,
+        stang_dongkrak: null,
+        ac_mobil: null,
+        audio_system: null,
+      });
+    } else {
+      setChecklists({
+        kunci_kontak: true,
+        stnk_asli: true,
+        ban_serep: true,
+        dongkrak_kit: true,
+        kunci_roda: true,
+        stang_dongkrak: true,
+        ac_mobil: true,
+        audio_system: true,
+      });
+    }
   };
 
-  const toggleChecklist = (key: string) => {
+
+  const setChecklistItem = (key: string, val: boolean) => {
     setChecklists((prev) => ({
       ...prev,
-      [key]: !prev[key],
+      [key]: prev[key] === val ? null : val,
     }));
   };
 
@@ -203,11 +279,175 @@ export default function ReturnScreen() {
     }));
   };
 
-  // Kunci Koordinat GPS
-  const handleLockGps = () => {
-    setGpsLocked(true);
-    setGpsCoord('Lat -6.1754, Long 106.8272');
-    Alert.alert('GPS Terkunci', 'Koordinat lokasi pengembalian berhasil diverifikasi dan dikunci.');
+  // Helper Pemilihan Foto (Kamera atau Galeri)
+  const pickImage = async (source: 'camera' | 'library'): Promise<string | null> => {
+    try {
+      if (source === 'camera') {
+        const { status } = await ImagePicker.requestCameraPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert('Izin Kamera Ditolak', 'Aplikasi membutuhkan izin akses kamera untuk mengambil foto dokumentasi.');
+          return null;
+        }
+        const result = await ImagePicker.launchCameraAsync({
+          allowsEditing: false,
+          quality: 0.8,
+        });
+        if (!result.canceled && result.assets && result.assets.length > 0) {
+          return result.assets[0].uri;
+        }
+      } else {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert('Izin Galeri Ditolak', 'Aplikasi membutuhkan izin galeri untuk memilih foto dokumentasi.');
+          return null;
+        }
+        const result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ['images'],
+          allowsEditing: false,
+          quality: 0.8,
+        });
+        if (!result.canceled && result.assets && result.assets.length > 0) {
+          return result.assets[0].uri;
+        }
+      }
+    } catch (err: any) {
+      console.error('PickImage error:', err);
+      Alert.alert('Error', 'Gagal memproses gambar: ' + (err?.message || 'Terjadi kesalahan'));
+    }
+    return null;
+  };
+
+  const selectImageSource = (title: string, onSelect: (uri: string) => void) => {
+    Alert.alert(
+      title,
+      'Pilih metode pengambilan foto dokumentasi:',
+      [
+        { text: 'Batal', style: 'cancel' },
+        {
+          text: 'Galeri Foto',
+          onPress: async () => {
+            const uri = await pickImage('library');
+            if (uri) onSelect(uri);
+          },
+        },
+        {
+          text: 'Kamera',
+          onPress: async () => {
+            const uri = await pickImage('camera');
+            if (uri) onSelect(uri);
+          },
+        },
+      ],
+      { cancelable: true }
+    );
+  };
+
+  // Photo Handlers
+  const handleAddUnitPhoto = () => {
+    selectImageSource('Foto Dokumentasi Mobil Kembali', (uri) => {
+      setUnitPhotos((prev) => [...prev, uri]);
+    });
+  };
+
+  const handleRemoveUnitPhoto = (index: number) => {
+    setUnitPhotos((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleAddSidePhoto = (side: BodySide) => {
+    selectImageSource(`Foto Tampak ${bodySides[side].title} (Kembali)`, (uri) => {
+      setSidePhotos((prev) => ({
+        ...prev,
+        [side]: [...(prev[side] || []), uri],
+      }));
+    });
+  };
+
+  const handleRemoveSidePhoto = (side: BodySide, index: number) => {
+    setSidePhotos((prev) => ({
+      ...prev,
+      [side]: prev[side].filter((_, i) => i !== index),
+    }));
+  };
+
+  // Total foto terunggah
+  const totalUploadedCount =
+    unitPhotos.length +
+    Object.values(sidePhotos).reduce((acc, curr) => acc + curr.length, 0);
+
+  // Date & Time Picker Handlers
+  const handleOpenDatePicker = () => {
+    setDateModalVisible(true);
+  };
+
+  const handleOpenTimePicker = () => {
+    setCustomTimeInput(checkinTime.replace(/\s*WIB/i, '').trim());
+    setTimeModalVisible(true);
+  };
+
+  const handleSelectTime = (timeStr: string) => {
+    setCheckinTime(timeStr.replace(/\s*WIB/i, '').trim());
+    setTimeModalVisible(false);
+  };
+
+  // Kunci Koordinat GPS Riil dengan expo-location
+  const handleLockGps = async () => {
+    setGpsLoading(true);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Izin GPS Ditolak',
+          'Aplikasi membutuhkan izin akses lokasi GPS untuk memverifikasi dan mengunci titik pengembalian unit.'
+        );
+        setGpsLoading(false);
+        return;
+      }
+
+      const loc = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+      });
+
+      const lat = loc.coords.latitude;
+      const lng = loc.coords.longitude;
+      const coordStr = `Lat ${lat.toFixed(6)}, Long ${lng.toFixed(6)}`;
+      setGpsCoord(coordStr);
+      setGpsLocked(true);
+
+      try {
+        const geocode = await Location.reverseGeocodeAsync({
+          latitude: lat,
+          longitude: lng,
+        });
+        if (geocode && geocode.length > 0) {
+          const place = geocode[0];
+          const addrParts = [
+            place.name,
+            place.street,
+            place.district || place.subregion,
+            place.city,
+          ].filter(Boolean);
+          const resolvedAddress = addrParts.join(', ');
+          if (resolvedAddress && !returnLocation) {
+            setReturnLocation(resolvedAddress);
+          }
+        }
+      } catch (geoErr) {
+        console.warn('[REVERSE GEOCODE ERROR]:', geoErr);
+      }
+
+      Alert.alert(
+        '✓ GPS Berhasil Dikunci',
+        `Koordinat lokasi pengembalian berhasil diverifikasi:\n${coordStr}`
+      );
+    } catch (err: any) {
+      console.error('Lock GPS Error:', err);
+      Alert.alert(
+        'Gagal Mengambil Koordinat GPS',
+        err?.message || 'Pastikan GPS dan layanan lokasi perangkat Anda telah diaktifkan.'
+      );
+    } finally {
+      setGpsLoading(false);
+    }
   };
 
   // Submit Penerimaan Unit Kembali
@@ -229,6 +469,26 @@ export default function ReturnScreen() {
       return;
     }
 
+    // Validasi Wajib Isi Semua 5 Sisi Inspeksi Bodi
+    const requiredSides: { key: BodySide; label: string }[] = [
+      { key: 'depan', label: 'Tampak Depan' },
+      { key: 'kiri', label: 'Samping Kiri' },
+      { key: 'kanan', label: 'Samping Kanan' },
+      { key: 'belakang', label: 'Tampak Belakang' },
+      { key: 'atap', label: 'Tampak Atas / Atap' },
+    ];
+
+    const uninspectedSides = requiredSides.filter((side) => !bodySides[side.key]?.condition || !bodySides[side.key]?.condition.trim());
+    if (uninspectedSides.length > 0) {
+      setActiveSide(uninspectedSides[0].key);
+      Alert.alert(
+        'Inspeksi Bodi Belum Lengkap',
+        `Inspeksi bodi pengembalian wajib diisi untuk SEMUA 5 sisi (Depan, Samping Kiri, Samping Kanan, Belakang, Atas) sebelum melanjutkan.\n\nSisi yang belum dipilih kondisinya:\n` +
+          uninspectedSides.map((s) => `• ${s.label}`).join('\n')
+      );
+      return;
+    }
+
     Alert.alert(
       'Konfirmasi Penerimaan Unit',
       `Selesaikan penyewaan untuk unit ${selectedBooking.car?.name || 'Mobil'} (${selectedBooking.car?.plate_number || '-'})?\n\nStatus booking akan menjadi Selesai (Completed) dan armada kembali berstatus Siap/Ready.`,
@@ -244,7 +504,7 @@ export default function ReturnScreen() {
               const payload: ReturnPayload = {
                 km_out: km,
                 fuel_out: fuelPercent,
-                fuel_range_km: Math.round((fuelPercent / 100) * 280),
+                fuel_range_km: parseInt(fuelRangeKm, 10) || Math.round((fuelPercent / 100) * 280),
                 handover_location: returnLocation.trim() || undefined,
                 notes: generalNotes.trim() || undefined,
                 checklist: {
@@ -253,6 +513,12 @@ export default function ReturnScreen() {
                   gps_coordinates: gpsCoord,
                   returned_at: now.toISOString(),
                 },
+                photos: unitPhotos.length > 0 ? unitPhotos : undefined,
+                body_depan_photos: sidePhotos.depan.length > 0 ? sidePhotos.depan : undefined,
+                body_kiri_photos: sidePhotos.kiri.length > 0 ? sidePhotos.kiri : undefined,
+                body_kanan_photos: sidePhotos.kanan.length > 0 ? sidePhotos.kanan : undefined,
+                body_belakang_photos: sidePhotos.belakang.length > 0 ? sidePhotos.belakang : undefined,
+                body_atap_photos: sidePhotos.atap.length > 0 ? sidePhotos.atap : undefined,
               };
 
               const res = await DeliveryReturnService.submitReturn(selectedBooking.id, payload);
@@ -284,15 +550,6 @@ export default function ReturnScreen() {
   const kmInNum = parseInt(kmIn, 10) || 0;
   const initialKmNum = parseInt(initialKm, 10) || 0;
   const distanceTraveled = kmInNum >= initialKmNum ? kmInNum - initialKmNum : 0;
-  const estimatedKm = Math.round((fuelPercent / 100) * 280);
-
-  // Render Gauge Needle SVG
-  const angleRad = Math.PI - (fuelPercent / 100) * Math.PI;
-  const needleLength = 65;
-  const needleX = 100 + needleLength * Math.cos(angleRad);
-  const needleY = 100 - needleLength * Math.sin(angleRad);
-  const arcX = 100 - 80 * Math.cos((fuelPercent / 100) * Math.PI);
-  const arcY = 100 - 80 * Math.sin((fuelPercent / 100) * Math.PI);
 
   // -------------------------------------------------------------
   // JIKA FORM DETAIL UNIT KEMBALI DIBUKA
@@ -342,51 +599,12 @@ export default function ReturnScreen() {
               <Text style={styles.stepText}>Langkah 3 dari 3</Text>
             </View>
 
-            {/* Hero Summary Card */}
-            <View style={styles.heroCard}>
-              <View style={styles.heroTopRow}>
-                <View style={{ flex: 1 }}>
-                  <View style={styles.badgeRow}>
-                    <View style={styles.plateBadge}>
-                      <Text style={styles.plateBadgeText}>
-                        {selectedBooking.car?.plate_number || 'BK 1088 CAN'}
-                      </Text>
-                    </View>
-                    <Text style={styles.bookingNumberSmall}>
-                      #{selectedBooking.booking_number || 'BK-20261024-ALPH99'}
-                    </Text>
-                  </View>
-                  <Text style={styles.carNameTitle}>
-                    {selectedBooking.car?.name || selectedBooking.car_type || 'Toyota Alphard 2.5 G'}
-                  </Text>
-                  <Text style={styles.carSubtitle}>
-                    {selectedBooking.car?.color || 'Black Metallic'} • Luxury VIP Executive
-                  </Text>
-                </View>
-                <View style={[styles.carIconBox, { backgroundColor: '#fef3c7' }]}>
-                  <MaterialIcons name="swap-horizontal-circle" size={28} color={BrandColors.secondary} />
-                </View>
-              </View>
-
-              <View style={styles.officerGrid}>
-                <View style={styles.officerCol}>
-                  <Text style={styles.officerLabel}>Petugas Penerima</Text>
-                  <Text style={styles.officerName}>
-                    {selectedBooking.peluncur_id ? 'Budi Santoso' : 'Dispatcher Pool 01'}
-                  </Text>
-                  <Text style={styles.officerRole}>Pemeriksa Armada Masuk</Text>
-                </View>
-                <View style={styles.officerCol}>
-                  <Text style={styles.officerLabel}>Konsumen / Penyewa</Text>
-                  <Text style={styles.officerName}>
-                    {selectedBooking.customer?.name || 'A. Fadli Akbar'}
-                  </Text>
-                  <Text style={styles.officerRole}>
-                    {selectedBooking.customer?.phone || 'PT. Mahakarya Energi'}
-                  </Text>
-                </View>
-              </View>
-            </View>
+            {/* Informasi Pihak Penyewa & Data Unit Armada Sesuai Aplikasi Desktop */}
+            <BookingInfoCard
+              booking={selectedBooking}
+              mode="return"
+              currentKm={kmIn}
+            />
 
             {/* 1. Detail Meteran & Waktu Kembali */}
             <View style={styles.sectionHeaderRow}>
@@ -428,25 +646,28 @@ export default function ReturnScreen() {
               <View style={styles.splitRow}>
                 <View style={[styles.fieldGroup, { flex: 1 }]}>
                   <Text style={styles.fieldLabel}>Jam Masuk *</Text>
-                  <View style={styles.inputContainer}>
-                    <MaterialIcons name="schedule" size={18} color={BrandColors.onSurfaceVariant} />
-                    <TextInput
-                      style={styles.textInput}
-                      value={checkinTime}
-                      onChangeText={setCheckinTime}
-                    />
-                  </View>
+                  <TouchableOpacity
+                    style={styles.pickerInputBtn}
+                    onPress={handleOpenTimePicker}
+                    activeOpacity={0.8}
+                  >
+                    <MaterialIcons name="schedule" size={18} color={BrandColors.primary} />
+                    <Text style={styles.pickerInputText}>{checkinTime || 'Pilih Jam'}</Text>
+                    <MaterialIcons name="arrow-drop-down" size={20} color={BrandColors.onSurfaceVariant} />
+                  </TouchableOpacity>
                 </View>
+
                 <View style={[styles.fieldGroup, { flex: 1 }]}>
                   <Text style={styles.fieldLabel}>Tanggal Masuk *</Text>
-                  <View style={styles.inputContainer}>
-                    <MaterialIcons name="calendar-today" size={18} color={BrandColors.onSurfaceVariant} />
-                    <TextInput
-                      style={styles.textInput}
-                      value={checkinDate}
-                      onChangeText={setCheckinDate}
-                    />
-                  </View>
+                  <TouchableOpacity
+                    style={styles.pickerInputBtn}
+                    onPress={handleOpenDatePicker}
+                    activeOpacity={0.8}
+                  >
+                    <MaterialIcons name="calendar-today" size={18} color={BrandColors.primary} />
+                    <Text style={styles.pickerInputText}>{checkinDate || 'Pilih Tanggal'}</Text>
+                    <MaterialIcons name="arrow-drop-down" size={20} color={BrandColors.onSurfaceVariant} />
+                  </TouchableOpacity>
                 </View>
               </View>
 
@@ -504,122 +725,68 @@ export default function ReturnScreen() {
                   </View>
                   <View style={styles.gpsCoordTag}>
                     <Text style={styles.gpsCoordText}>
-                      <Text style={{ fontWeight: '700', color: '#059669' }}>GPS Masuk: </Text>
+                      <Text style={{ fontWeight: '700', color: '#059669' }}>GPS: </Text>
                       {gpsCoord}
                     </Text>
                   </View>
                 </View>
 
                 <TouchableOpacity
-                  style={[styles.radarBtn, { backgroundColor: BrandColors.secondary }, gpsLocked && styles.radarBtnLocked]}
+                  style={[
+                    styles.radarBtn,
+                    { backgroundColor: BrandColors.secondary },
+                    gpsLocked && styles.radarBtnLocked,
+                    gpsLoading && { opacity: 0.7 },
+                  ]}
                   onPress={handleLockGps}
+                  disabled={gpsLoading}
                   activeOpacity={0.8}
                 >
-                  <MaterialIcons name={gpsLocked ? 'verified' : 'lock'} size={18} color="#fff" />
+                  {gpsLoading ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <MaterialIcons name={gpsLocked ? 'verified' : 'my-location'} size={18} color="#fff" />
+                  )}
                   <Text style={styles.radarBtnText}>
-                    {gpsLocked ? 'Lokasi Berhasil Dikunci' : 'Kunci Titik GPS Pengembalian'}
+                    {gpsLoading
+                      ? 'Mendeteksi Posisi GPS...'
+                      : gpsLocked
+                        ? 'Lokasi Berhasil Dikunci (Ketuk Ulang)'
+                        : 'Kunci Titik GPS Pengembalian'}
                   </Text>
                 </TouchableOpacity>
               </View>
 
-              {/* Interactive Fuel Meter */}
-              <View style={styles.fuelCard}>
-                <View style={styles.fuelHeader}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <MaterialIcons name="local-gas-station" size={20} color={BrandColors.secondary} />
-                    <Text style={styles.radarTitle}>Indikator BBM Masuk (Fuel Level)</Text>
-                  </View>
-                  <View style={styles.fuelValueBadge}>
-                    <Text style={styles.fuelValueText}>
-                      {fuelPercent}% ({fuelPercent > 80 ? 'Full' : fuelPercent > 35 ? '~1/2' : 'Kritis'})
-                    </Text>
-                  </View>
-                </View>
-
-                {/* Gauge SVG */}
-                <View style={styles.gaugeContainer}>
-                  <Svg width={180} height={100} viewBox="0 0 200 110">
-                    <Path
-                      d="M 20 100 A 80 80 0 0 1 180 100"
-                      fill="none"
-                      stroke="#dae2fd"
-                      strokeWidth={14}
-                      strokeLinecap="round"
-                    />
-                    <Path
-                      d={`M 20 100 A 80 80 0 0 1 ${arcX} ${arcY}`}
-                      fill="none"
-                      stroke="#007bb9"
-                      strokeWidth={14}
-                      strokeLinecap="round"
-                    />
-                    <SvgText x="18" y="108" fill="#707881" fontSize="10" fontWeight="700">
-                      E
-                    </SvgText>
-                    <SvgText x="96" y="18" fill="#707881" fontSize="10" fontWeight="700">
-                      1/2
-                    </SvgText>
-                    <SvgText x="176" y="108" fill="#707881" fontSize="10" fontWeight="700">
-                      F
-                    </SvgText>
-                    <Circle cx="100" cy="100" r="7" fill="#131b2e" />
-                    <Line
-                      x1="100"
-                      y1="100"
-                      x2={needleX}
-                      y2={needleY}
-                      stroke="#131b2e"
-                      strokeWidth={3}
-                      strokeLinecap="round"
-                    />
-                  </Svg>
-
-                  {/* Quick Select Buttons */}
-                  <View style={styles.fuelQuickRow}>
-                    {[15, 25, 40, 50, 75, 100].map((val) => (
-                      <TouchableOpacity
-                        key={val}
-                        style={[
-                          styles.fuelSelectBtn,
-                          fuelPercent === val && styles.fuelSelectBtnActive,
-                        ]}
-                        onPress={() => setFuelPercent(val)}
-                      >
-                        <Text
-                          style={[
-                            styles.fuelSelectBtnText,
-                            fuelPercent === val && styles.fuelSelectBtnTextActive,
-                          ]}
-                        >
-                          {val}%
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-
-                <View style={styles.rangeRow}>
-                  <Text style={styles.rangeLabel}>Estimasi Sisa Jarak (KM):</Text>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                    <Text style={styles.rangeVal}>{estimatedKm}</Text>
-                    <Text style={styles.rangeUnit}>KM</Text>
-                  </View>
-                </View>
-              </View>
+              {/* Interactive Fuel Indicator Sesuai Desktop (Dial / Tangga / Kotak) */}
+              <FuelIndicatorCard
+                fuelPercent={fuelPercent}
+                onFuelPercentChange={setFuelPercent}
+                fuelRangeKm={fuelRangeKm}
+                onFuelRangeKmChange={setFuelRangeKm}
+                initialModel="dial"
+                rangeLabel="RANGE BBM (KM): *"
+              />
             </View>
 
             {/* 2. Status Kelengkapan Unit Saat Kembali */}
             <View style={styles.sectionHeaderRow}>
               <View style={styles.sectionTitleGroup}>
                 <MaterialIcons name="fact-check" size={20} color={BrandColors.primary} />
-                <Text style={styles.sectionTitle}>2. Status Kelengkapan Kembali</Text>
+                <View>
+                  <Text style={styles.sectionTitle}>2. Status Kelengkapan Kembali</Text>
+                  <Text style={styles.sectionRequiredSubtitle}>
+                    *Wajib Semua <Text style={{ color: '#059669', fontWeight: '700' }}>OK</Text> <Text style={{ color: '#dc2626', fontWeight: '700' }}>TIDAK</Text>
+                  </Text>
+                </View>
               </View>
               <TouchableOpacity
                 style={styles.allOkBtn}
                 onPress={handleToggleAllOk}
                 activeOpacity={0.8}
               >
-                <Text style={styles.allOkBtnText}>✓ Semua Lengkap</Text>
+                <Text style={styles.allOkBtnText}>
+                  {Object.values(checklists).every((v) => v === true) ? '↺ Reset Default' : '✓ Semua OK'}
+                </Text>
               </TouchableOpacity>
             </View>
 
@@ -629,45 +796,82 @@ export default function ReturnScreen() {
               </Text>
 
               {[
-                { key: 'kunci_kontak', icon: 'key', label: 'Kunci Kontak Utama & Cadangan Kembali' },
-                { key: 'stnk_asli', icon: 'description', label: 'Copy STNK Asli Diterima Kembali' },
-                { key: 'ban_serep', icon: 'tire-repair', label: 'Ban Serep / Cadangan Tidak Hilang' },
-                { key: 'dongkrak_kit', icon: 'car-repair', label: 'Dongkrak Kit Set Lengkap' },
-                { key: 'kunci_roda', icon: 'build', label: 'Kunci Roda Set Tool Package' },
-                { key: 'stang_dongkrak', icon: 'pan-tool-alt', label: 'Stang Dongkrak Putar' },
-                { key: 'ac_mobil', icon: 'ac-unit', label: 'AC Mobil Dingin & Blower Normal' },
-                { key: 'audio_system', icon: 'volume-up', label: 'Headunit & Audio Berfungsi Baik' },
-              ].map((item) => {
-                const isOk = checklists[item.key];
+                { key: 'kunci_kontak', icon: 'vpn-key', label: 'Kunci Kontak Utama & Cadangan' },
+                { key: 'stnk_asli', icon: 'description', label: 'Copy STNK Asli / Pajak Hidup' },
+                { key: 'ban_serep', icon: 'radio-button-checked', label: 'Ban Serep / Cadangan Standard' },
+                { key: 'dongkrak_kit', icon: 'build', label: 'Dongkrak Kit Set Complete' },
+                { key: 'kunci_roda', icon: 'construction', label: 'Kunci Roda Set Tool Package' },
+                { key: 'stang_dongkrak', icon: 'handyman', label: 'Stang Dongkrak Putar' },
+                { key: 'ac_mobil', icon: 'ac-unit', label: 'AC Mobil Dingin & Blower Aktif' },
+                { key: 'audio_system', icon: 'volume-up', label: 'Audio System / Bluetooth Tape' },
+              ].map((item, idx, arr) => {
+                const isOk = checklists[item.key] === true;
+                const isNotOk = checklists[item.key] === false;
                 return (
-                  <View key={item.key} style={styles.checkRow}>
+                  <View
+                    key={item.key}
+                    style={[
+                      styles.checkRow,
+                      idx === arr.length - 1 && { borderBottomWidth: 0 },
+                    ]}
+                  >
                     <View style={styles.checkLeft}>
                       <MaterialIcons
                         name={item.icon as any}
-                        size={20}
-                        color={BrandColors.primary}
+                        size={18}
+                        color="#64748b"
                       />
-                      <Text style={styles.checkLabel} numberOfLines={1}>
+                      <Text style={styles.checkLabel} numberOfLines={2}>
                         {item.label}
                       </Text>
                     </View>
-                    <TouchableOpacity
-                      style={[
-                        styles.checkToggleBtn,
-                        isOk ? styles.checkToggleBtnOk : styles.checkToggleBtnNo,
-                      ]}
-                      onPress={() => toggleChecklist(item.key)}
-                      activeOpacity={0.8}
-                    >
-                      <Text
+                    <View style={styles.checkActionsGroup}>
+                      <TouchableOpacity
                         style={[
-                          styles.checkToggleBtnText,
-                          isOk ? styles.checkToggleTextOk : styles.checkToggleTextNo,
+                          styles.checkPillBtn,
+                          isOk ? styles.checkPillBtnOkActive : styles.checkPillBtnInactive,
                         ]}
+                        onPress={() => setChecklistItem(item.key, true)}
+                        activeOpacity={0.8}
                       >
-                        {isOk ? '✓ OK' : '✕ Tidak'}
-                      </Text>
-                    </TouchableOpacity>
+                        <MaterialIcons
+                          name="check"
+                          size={14}
+                          color={isOk ? '#ffffff' : '#64748b'}
+                        />
+                        <Text
+                          style={[
+                            styles.checkPillText,
+                            isOk ? styles.checkPillTextOkActive : styles.checkPillTextInactive,
+                          ]}
+                        >
+                          OK
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[
+                          styles.checkPillBtn,
+                          isNotOk ? styles.checkPillBtnNoActive : styles.checkPillBtnInactive,
+                        ]}
+                        onPress={() => setChecklistItem(item.key, false)}
+                        activeOpacity={0.8}
+                      >
+                        <MaterialIcons
+                          name="error-outline"
+                          size={14}
+                          color={isNotOk ? '#dc2626' : '#64748b'}
+                        />
+                        <Text
+                          style={[
+                            styles.checkPillText,
+                            isNotOk ? styles.checkPillTextNoActive : styles.checkPillTextInactive,
+                          ]}
+                        >
+                          Tidak
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 );
               })}
@@ -677,26 +881,31 @@ export default function ReturnScreen() {
             <View style={styles.sectionHeaderRow}>
               <View style={styles.sectionTitleGroup}>
                 <MaterialIcons name="directions-car-filled" size={20} color={BrandColors.primary} />
-                <Text style={styles.sectionTitle}>3. Inspeksi Bodi Masuk (5 Sisi)</Text>
+                <View>
+                  <Text style={styles.sectionTitle}>3. Inspeksi Bodi Masuk (5 Sisi)</Text>
+                  <Text style={styles.sectionRequiredSubtitle}>
+                    *Wajib isi semua 5 sisi ({Object.values(bodySides).filter((s) => Boolean(s.condition)).length}/5 Terisi)
+                  </Text>
+                </View>
               </View>
-              <Text style={styles.inspectHint}>Pemeriksaan Fisik</Text>
+              <View style={[
+                styles.requiredTag,
+                Object.values(bodySides).every((s) => Boolean(s.condition))
+                  ? { backgroundColor: '#dcfce7', borderColor: '#86efac' }
+                  : { backgroundColor: '#fee2e2', borderColor: '#fca5a5' }
+              ]}>
+                <Text style={[
+                  styles.requiredTagText,
+                  Object.values(bodySides).every((s) => Boolean(s.condition))
+                    ? { color: '#16a34a' }
+                    : { color: '#dc2626' }
+                ]}>
+                  {Object.values(bodySides).every((s) => Boolean(s.condition)) ? '✓ 5 Sisi Lengkap' : 'Wajib 5 Sisi'}
+                </Text>
+              </View>
             </View>
 
             <View style={styles.sectionCard}>
-              <View style={styles.legendGrid}>
-                <View style={[styles.legendBox, { backgroundColor: '#eff6ff' }]}>
-                  <Text style={[styles.legendText, { color: BrandColors.primary }]}>✓ Baik</Text>
-                </View>
-                <View style={[styles.legendBox, { backgroundColor: '#fef3c7' }]}>
-                  <Text style={[styles.legendText, { color: '#b45309' }]}>{'// Baret'}</Text>
-                </View>
-                <View style={[styles.legendBox, { backgroundColor: '#fed7aa' }]}>
-                  <Text style={[styles.legendText, { color: '#c2410c' }]}>O Penyok</Text>
-                </View>
-                <View style={[styles.legendBox, { backgroundColor: '#fee2e2' }]}>
-                  <Text style={[styles.legendText, { color: '#dc2626' }]}>X Rusak</Text>
-                </View>
-              </View>
 
               {/* Tab 5 Sisi */}
               <ScrollView
@@ -711,25 +920,42 @@ export default function ReturnScreen() {
                   { key: 'kanan', label: 'Samping Kanan' },
                   { key: 'belakang', label: 'Belakang' },
                   { key: 'atap', label: 'Atap' },
-                ].map((s) => (
-                  <TouchableOpacity
-                    key={s.key}
-                    style={[
-                      styles.sideTabBtn,
-                      activeSide === s.key && styles.sideTabBtnActive,
-                    ]}
-                    onPress={() => setActiveSide(s.key as BodySide)}
-                  >
-                    <Text
+                ].map((s) => {
+                  const isFilled = Boolean(bodySides[s.key as BodySide]?.condition);
+                  return (
+                    <TouchableOpacity
+                      key={s.key}
                       style={[
-                        styles.sideTabText,
-                        activeSide === s.key && styles.sideTabTextActive,
+                        styles.sideTabBtn,
+                        activeSide === s.key && styles.sideTabBtnActive,
+                        isFilled && activeSide !== s.key && { borderColor: '#10b981', backgroundColor: '#f0fdf4' },
                       ]}
+                      onPress={() => setActiveSide(s.key as BodySide)}
+                      activeOpacity={0.8}
                     >
-                      {s.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                        <Text
+                          style={[
+                            styles.sideTabText,
+                            activeSide === s.key && styles.sideTabTextActive,
+                            isFilled && activeSide !== s.key && { color: '#059669', fontWeight: '600' },
+                          ]}
+                        >
+                          {s.label}
+                        </Text>
+                        {isFilled ? (
+                          <MaterialIcons
+                            name="check-circle"
+                            size={14}
+                            color={activeSide === s.key ? '#ffffff' : '#10b981'}
+                          />
+                        ) : (
+                          <Text style={{ color: activeSide === s.key ? '#fee2e2' : '#dc2626', fontSize: 11, fontWeight: '700' }}>*</Text>
+                        )}
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
               </ScrollView>
 
               {/* Blueprint Canvas Box */}
@@ -739,9 +965,15 @@ export default function ReturnScreen() {
                     <View style={styles.blueDot} />
                     <Text style={styles.blueprintTitle}>{curSide.title}</Text>
                   </View>
-                  <View style={styles.conditionTag}>
-                    <Text style={styles.conditionTagText}>
-                      Kondisi: {curSide.condition.toUpperCase()}
+                  <View style={[
+                    styles.conditionTag,
+                    !curSide.condition && { backgroundColor: '#fee2e2', borderColor: '#fca5a5' }
+                  ]}>
+                    <Text style={[
+                      styles.conditionTagText,
+                      !curSide.condition && { color: '#dc2626', fontWeight: '700' }
+                    ]}>
+                      Kondisi: {curSide.condition ? curSide.condition.toUpperCase() : 'BELUM DIPILIH (WAJIB)'}
                     </Text>
                   </View>
                 </View>
@@ -884,12 +1116,33 @@ export default function ReturnScreen() {
 
               <TouchableOpacity
                 style={styles.photoSideBtn}
-                onPress={() => Alert.alert('Kamera', `Membuka kamera untuk foto ${curSide.title}...`)}
+                onPress={() => handleAddSidePhoto(activeSide)}
                 activeOpacity={0.8}
               >
                 <MaterialIcons name="photo-camera" size={18} color={BrandColors.primary} />
                 <Text style={styles.photoSideBtnText}>Ambil Foto {curSide.title}</Text>
               </TouchableOpacity>
+
+              {/* Preview Foto Sisi Ini */}
+              {sidePhotos[activeSide] && sidePhotos[activeSide].length > 0 && (
+                <View style={styles.sidePhotosContainer}>
+                  <Text style={styles.sidePhotosLabel}>Foto Sisi {curSide.title} ({sidePhotos[activeSide].length}):</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 4 }}>
+                    {sidePhotos[activeSide].map((uri, idx) => (
+                      <View key={idx} style={styles.photoThumbnail}>
+                        <Image source={{ uri }} style={styles.photoImg} />
+                        <TouchableOpacity
+                          style={styles.removePhotoBadge}
+                          onPress={() => handleRemoveSidePhoto(activeSide, idx)}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        >
+                          <MaterialIcons name="close" size={12} color="#ffffff" />
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
             </View>
 
             {/* 4. Foto Dokumentasi Pengembalian */}
@@ -899,46 +1152,42 @@ export default function ReturnScreen() {
                 <Text style={styles.sectionTitle}>4. Foto Dokumentasi Pengembalian</Text>
               </View>
               <View style={styles.photoCountTag}>
-                <Text style={styles.photoCountText}>2 Terunggah</Text>
+                <Text style={styles.photoCountText}>{totalUploadedCount} Terunggah</Text>
               </View>
             </View>
 
             <View style={styles.sectionCard}>
               <Text style={styles.fieldLabel}>Foto Fisik Mobil Masuk & Odometer:</Text>
-              <View style={styles.galleryRow}>
-                <View style={styles.photoThumbnail}>
-                  <Image
-                    source={{
-                      uri: 'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?auto=format&fit=crop&w=300&q=80',
-                    }}
-                    style={styles.photoImg}
-                  />
-                  <View style={styles.photoCaption}>
-                    <Text style={styles.photoCaptionText}>Fisik Kembali</Text>
+              <ScrollView
+                horizontal={true}
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ gap: 8, paddingVertical: 4 }}
+              >
+                {unitPhotos.map((uri, idx) => (
+                  <View key={idx} style={styles.photoThumbnail}>
+                    <Image source={{ uri }} style={styles.photoImg} />
+                    <TouchableOpacity
+                      style={styles.removePhotoBadge}
+                      onPress={() => handleRemoveUnitPhoto(idx)}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <MaterialIcons name="close" size={12} color="#ffffff" />
+                    </TouchableOpacity>
+                    <View style={styles.photoCaption}>
+                      <Text style={styles.photoCaptionText}>Foto #{idx + 1}</Text>
+                    </View>
                   </View>
-                </View>
-
-                <View style={styles.photoThumbnail}>
-                  <Image
-                    source={{
-                      uri: 'https://images.unsplash.com/photo-1517524008697-84bbe3c3fd98?auto=format&fit=crop&w=300&q=80',
-                    }}
-                    style={styles.photoImg}
-                  />
-                  <View style={styles.photoCaption}>
-                    <Text style={styles.photoCaptionText}>KM Masuk</Text>
-                  </View>
-                </View>
+                ))}
 
                 <TouchableOpacity
                   style={styles.addPhotoBtn}
-                  onPress={() => Alert.alert('Foto', 'Tambah dokumentasi fisik kembali...')}
+                  onPress={handleAddUnitPhoto}
                   activeOpacity={0.7}
                 >
-                  <MaterialIcons name="add-photo-alternate" size={26} color={BrandColors.primary} />
+                  <MaterialIcons name="add-a-photo" size={24} color={BrandColors.primary} />
                   <Text style={styles.addPhotoText}>+ Tambah</Text>
                 </TouchableOpacity>
-              </View>
+              </ScrollView>
             </View>
 
             {/* 5. Catatan Tambahan & Denda */}
@@ -995,6 +1244,87 @@ export default function ReturnScreen() {
             )}
           </TouchableOpacity>
         </View>
+        {/* Date Picker Modal (Kalender Interaktif) */}
+        <CalendarPickerModal
+          visible={dateModalVisible}
+          onClose={() => setDateModalVisible(false)}
+          selectedDate={checkinDate}
+          onSelectDate={(newDate) => setCheckinDate(newDate)}
+          title="Pilih Tanggal Masuk"
+          subtitle="Target: Jadwal Pengembalian Unit"
+        />
+
+        {/* Time Picker Modal (Pilihan Jam) */}
+        <Modal
+          visible={timeModalVisible}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setTimeModalVisible(false)}
+        >
+          <View style={styles.modalOverlayCenter}>
+            <View style={styles.timeModalContent}>
+              <View style={styles.modalHeader}>
+                <View>
+                  <Text style={styles.modalTitle}>Pilih Jam Masuk</Text>
+                  <Text style={styles.calendarModalSubtitle}>Waktu penerimaan unit armada</Text>
+                </View>
+                <TouchableOpacity onPress={() => setTimeModalVisible(false)}>
+                  <MaterialIcons name="close" size={22} color={BrandColors.onSurface} />
+                </TouchableOpacity>
+              </View>
+
+              <Text style={styles.presetSectionTitle}>Pilihan Jam Operasional</Text>
+              <View style={styles.timePresetsGrid}>
+                {PRESET_TIMES.map((timeStr) => {
+                  const isSelected = checkinTime === timeStr;
+                  return (
+                    <TouchableOpacity
+                      key={timeStr}
+                      style={[
+                        styles.timePresetPill,
+                        isSelected ? styles.timePresetPillSelected : null,
+                      ]}
+                      onPress={() => handleSelectTime(timeStr)}
+                    >
+                      <Text
+                        style={[
+                          styles.timePresetPillText,
+                          isSelected ? styles.timePresetPillTextSelected : null,
+                        ]}
+                      >
+                        {timeStr}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* Custom Time Input */}
+              <View style={styles.customTimeBox}>
+                <Text style={styles.fieldLabel}>Atau Masukkan Jam Tertentu:</Text>
+                <View style={styles.customTimeRow}>
+                  <TextInput
+                    style={styles.customTimeInput}
+                    placeholder="Contoh: 17:15"
+                    value={customTimeInput}
+                    onChangeText={setCustomTimeInput}
+                    maxLength={5}
+                  />
+                  <TouchableOpacity
+                    style={[styles.customTimeSetBtn, { backgroundColor: BrandColors.secondary }]}
+                    onPress={() => {
+                      if (customTimeInput.trim()) {
+                        handleSelectTime(customTimeInput.trim());
+                      }
+                    }}
+                  >
+                    <Text style={styles.customTimeSetBtnText}>Pilih</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </SafeAreaView>
     );
   }
@@ -1025,8 +1355,8 @@ export default function ReturnScreen() {
               isOnTrip
                 ? styles.statusOnTripBadge
                 : isCompleted
-                ? styles.statusCompletedBadge
-                : styles.statusDefaultBadge,
+                  ? styles.statusCompletedBadge
+                  : styles.statusDefaultBadge,
             ]}
           >
             <MaterialIcons
@@ -1040,8 +1370,8 @@ export default function ReturnScreen() {
                 isOnTrip
                   ? styles.statusOnTripText
                   : isCompleted
-                  ? styles.statusCompletedText
-                  : styles.statusDefaultText,
+                    ? styles.statusCompletedText
+                    : styles.statusDefaultText,
               ]}
             >
               {isOnTrip ? 'Sedang Jalan' : isCompleted ? 'Selesai' : item.status}
@@ -1671,7 +2001,32 @@ const styles = StyleSheet.create({
   },
   rangeLabel: {
     fontSize: 12,
+    fontWeight: '600',
+    color: BrandColors.onSurface,
+  },
+  rangeSubLabel: {
+    fontSize: 10,
     color: BrandColors.onSurfaceVariant,
+    marginTop: 1,
+  },
+  rangeInputBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f1f5f9',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+  },
+  rangeInput: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: BrandColors.primary,
+    minWidth: 54,
+    textAlign: 'right',
+    paddingVertical: 4,
+    paddingRight: 4,
   },
   rangeVal: {
     fontSize: 15,
@@ -1701,47 +2056,77 @@ const styles = StyleSheet.create({
     color: BrandColors.onSurfaceVariant,
     marginBottom: 4,
   },
+  sectionRequiredSubtitle: {
+    fontSize: 10,
+    color: '#ef4444',
+    marginTop: 2,
+    fontWeight: '500',
+  },
   checkRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#f2f3ff',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
+    backgroundColor: '#ffffff',
+    paddingVertical: 10,
+    paddingHorizontal: 2,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
   },
   checkLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
     flex: 1,
     paddingRight: 8,
   },
   checkLabel: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
-    color: BrandColors.onSurface,
+    color: '#1e293b',
+    flex: 1,
   },
-  checkToggleBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 16,
+  checkActionsGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
-  checkToggleBtnOk: {
+  checkPillBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+    minWidth: 56,
+  },
+  checkPillBtnOkActive: {
     backgroundColor: BrandColors.primary,
+    borderColor: BrandColors.primary,
   },
-  checkToggleBtnNo: {
-    backgroundColor: '#ffdad6',
+  checkPillBtnNoActive: {
+    backgroundColor: '#fee2e2',
+    borderColor: '#ef4444',
   },
-  checkToggleBtnText: {
+  checkPillBtnInactive: {
+    backgroundColor: '#ffffff',
+    borderColor: '#cbd5e1',
+  },
+  checkPillText: {
     fontSize: 11,
+    fontWeight: '600',
+  },
+  checkPillTextOkActive: {
+    color: '#ffffff',
     fontWeight: '700',
   },
-  checkToggleTextOk: {
-    color: '#ffffff',
+  checkPillTextNoActive: {
+    color: '#dc2626',
+    fontWeight: '700',
   },
-  checkToggleTextNo: {
-    color: '#93000a',
+  checkPillTextInactive: {
+    color: '#64748b',
   },
 
   // Inspeksi 5 Sisi
@@ -1931,6 +2316,30 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     color: BrandColors.primary,
+  },
+  removePhotoBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: 'rgba(220, 38, 38, 0.88)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+  },
+  sidePhotosContainer: {
+    marginTop: 10,
+    backgroundColor: '#ffffff',
+    borderRadius: 8,
+    padding: 8,
+  },
+  sidePhotosLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: BrandColors.onSurface,
+    marginBottom: 4,
   },
 
   // Catatan
@@ -2276,5 +2685,227 @@ const styles = StyleSheet.create({
     color: BrandColors.onSurfaceVariant,
     textAlign: 'center',
     marginTop: 6,
+  },
+
+  // Picker Input Button
+  pickerInputBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#f2f3ff',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginTop: 4,
+  },
+  pickerInputText: {
+    flex: 1,
+    marginLeft: 8,
+    fontSize: 13,
+    fontWeight: '700',
+    color: BrandColors.onSurface,
+  },
+
+  // Modals Styling
+  modalOverlayCenter: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: BrandColors.onSurface,
+  },
+  calendarModalContent: {
+    width: '100%',
+    maxWidth: 360,
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  calendarModalSubtitle: {
+    fontSize: 11,
+    color: BrandColors.onSurfaceVariant,
+    marginTop: 2,
+  },
+  calendarMonthNav: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginVertical: 14,
+    paddingHorizontal: 4,
+  },
+  navArrowBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#f1f5f9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  calendarMonthTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: BrandColors.onSurface,
+  },
+  dayNamesRow: {
+    flexDirection: 'row',
+    marginBottom: 8,
+  },
+  dayNameText: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 12,
+    fontWeight: '600',
+    color: BrandColors.onSurfaceVariant,
+  },
+  sundayText: {
+    color: '#dc2626',
+  },
+  daysGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  dayCellEmpty: {
+    width: `${100 / 7}%`,
+    height: 40,
+  },
+  dayCell: {
+    width: `${100 / 7}%`,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 20,
+  },
+  dayCellSelected: {
+    backgroundColor: BrandColors.secondary,
+  },
+  dayCellToday: {
+    borderWidth: 1.5,
+    borderColor: BrandColors.secondary,
+  },
+  dayCellText: {
+    fontSize: 13,
+    color: BrandColors.onSurface,
+    fontWeight: '500',
+  },
+  dayCellTextSelected: {
+    color: '#ffffff',
+    fontWeight: '700',
+  },
+  dayCellTextToday: {
+    color: BrandColors.secondary,
+    fontWeight: '700',
+  },
+  calendarQuickActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 10,
+    marginTop: 14,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+  },
+  quickActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 14,
+    backgroundColor: '#fef3c7',
+  },
+  quickActionBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: BrandColors.secondary,
+  },
+  timeModalContent: {
+    width: '100%',
+    maxWidth: 360,
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  presetSectionTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: BrandColors.onSurface,
+    marginTop: 10,
+    marginBottom: 8,
+  },
+  timePresetsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  timePresetPill: {
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+    borderRadius: 16,
+    backgroundColor: '#f1f5f9',
+  },
+  timePresetPillSelected: {
+    backgroundColor: BrandColors.secondary,
+  },
+  timePresetPillText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: BrandColors.onSurface,
+  },
+  timePresetPillTextSelected: {
+    color: '#ffffff',
+    fontWeight: '700',
+  },
+  customTimeBox: {
+    marginTop: 16,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+    gap: 6,
+  },
+  customTimeRow: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+  },
+  customTimeInput: {
+    flex: 1,
+    backgroundColor: '#f1f5f9',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 14,
+    fontWeight: '700',
+    color: BrandColors.onSurface,
+  },
+  customTimeSetBtn: {
+    backgroundColor: BrandColors.secondary,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  customTimeSetBtnText: {
+    color: '#ffffff',
+    fontWeight: '700',
+    fontSize: 12,
   },
 });
