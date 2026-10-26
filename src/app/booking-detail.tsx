@@ -2,7 +2,6 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   Animated,
   Linking,
@@ -18,6 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BrandColors } from '@/constants/brand';
 import { BookingDetail, BookingService } from '@/services/booking';
+import { ModernLoadingScreen } from '@/components/ModernLoading';
 
 export default function BookingDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -241,10 +241,11 @@ export default function BookingDetailScreen() {
       )}
 
       {loading ? (
-        <View style={styles.loaderContainer}>
-          <ActivityIndicator size="large" color={BrandColors.primary} />
-          <Text style={styles.loaderText}>Memuat detail reservasi...</Text>
-        </View>
+        <ModernLoadingScreen
+          title="Detail Reservasi Armada"
+          message="Sedang menyinkronkan status unit, jadwal & dokumen..."
+          showTips
+        />
       ) : (
         <ScrollView
           contentContainerStyle={styles.scrollContent}

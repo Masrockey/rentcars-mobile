@@ -3,7 +3,6 @@ import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Platform,
@@ -17,6 +16,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ModernLoadingIndicator, ModernLoadingOverlay } from '@/components/ModernLoading';
 import { BrandColors } from '@/constants/brand';
 import { AuthError, AuthService } from '@/services/auth';
 import { StorageService } from '@/services/storage';
@@ -219,7 +219,7 @@ export default function LoginScreen() {
               disabled={loading}
               activeOpacity={0.85}>
               {loading ? (
-                <ActivityIndicator color={BrandColors.onPrimary} size="small" />
+                <ModernLoadingIndicator size="mini" color="#ffffff" accentColor="#ffddb8" />
               ) : (
                 <>
                   <Text style={styles.primaryButtonText}>Masuk ke Sistem</Text>
@@ -228,7 +228,7 @@ export default function LoginScreen() {
               )}
             </TouchableOpacity>
 
-            {/* Alternative Biometric Access */}
+            {/* Alternative Biometric Access & Animation Showcase */}
             <View style={styles.biometricContainer}>
               <TouchableOpacity
                 style={styles.biometricButton}
@@ -237,6 +237,14 @@ export default function LoginScreen() {
                 <MaterialIcons name="fingerprint" size={18} color={BrandColors.primary} />
                 <Text style={styles.biometricText}>Masuk Cepat via Biometrik</Text>
               </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.demoSplashBtn}
+                onPress={() => router.push('/splash' as any)}
+                activeOpacity={0.75}>
+                <MaterialIcons name="auto-awesome" size={16} color={BrandColors.secondary} />
+                <Text style={styles.demoSplashText}>Lihat Demo Splash &amp; Loading</Text>
+              </TouchableOpacity>
             </View>
           </View>
 
@@ -244,7 +252,7 @@ export default function LoginScreen() {
           <View style={styles.footerContainer}>
             <View style={styles.versionBadge}>
               <MaterialIcons name="verified" size={14} color={BrandColors.onSurfaceVariant} />
-              <Text style={styles.versionText}>Versi 1.0.0</Text>
+              <Text style={styles.versionText}>CDK Enterprise V1.0.0</Text>
             </View>
             <Text style={styles.copyrightText}>
               © 2026 PT. Cahaya Auto Nusantara. Hak Cipta Dilindungi.
@@ -253,6 +261,13 @@ export default function LoginScreen() {
 
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Modern Loading Overlay Saat Proses Login */}
+      <ModernLoadingOverlay
+        visible={loading}
+        title="Otentikasi Akun"
+        message="Sedang memverifikasi kredensial ke sistem armada CAN..."
+      />
     </SafeAreaView>
   );
 }
@@ -496,6 +511,19 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: BrandColors.primary,
+  },
+  demoSplashBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+  },
+  demoSplashText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: BrandColors.secondary,
   },
 
   /* Footer */

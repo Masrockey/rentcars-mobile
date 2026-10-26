@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   ScrollView,
   TextInput,
-  ActivityIndicator,
   Modal,
   RefreshControl,
   Alert,
@@ -18,6 +17,7 @@ import { useRouter } from 'expo-router';
 import { BrandColors } from '@/constants/brand';
 import { BookingDetail, Car, Driver } from '@/services/booking';
 import { AllocationService, BlacklistRecord } from '@/services/allocation';
+import { ModernLoadingIndicator } from '@/components/ModernLoading';
 
 const { width } = Dimensions.get('window');
 
@@ -389,8 +389,11 @@ export default function AllocationScreen() {
       {/* 4. DAFTAR KARTU ALOKASI ARMADA */}
       {loading ? (
         <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color={BrandColors.primary} />
-          <Text style={styles.loadingText}>Memuat data alokasi armada...</Text>
+          <ModernLoadingIndicator
+            size="large"
+            message="Memuat data alokasi armada..."
+            submessage="Sinkronisasi data unit & reservasi terbaru"
+          />
         </View>
       ) : (
         <ScrollView
@@ -553,15 +556,11 @@ export default function AllocationScreen() {
             {/* TAHAP A: SEDANG MEMERIKSA DATA BLACKLIST */}
             {checkStage === 'checking' && (
               <View style={styles.modalCenterContent}>
-                {/* Shield Icon dengan Spinner */}
-                <View style={styles.shieldPulseContainer}>
-                  <View style={styles.shieldOuterRing}>
-                    <ActivityIndicator size="large" color={BrandColors.primary} />
-                  </View>
-                  <View style={styles.shieldInnerIcon}>
-                    <MaterialIcons name="verified-user" size={32} color={BrandColors.primary} />
-                  </View>
-                </View>
+                <ModernLoadingIndicator
+                  size="large"
+                  color={BrandColors.primary}
+                  accentColor={BrandColors.secondaryContainer}
+                />
 
                 <Text style={styles.checkTitle}>Memeriksa Data Blacklist...</Text>
                 <Text style={styles.checkSubtitle}>
@@ -869,7 +868,7 @@ export default function AllocationScreen() {
                   activeOpacity={0.85}
                   onPress={handleSaveAllocation}>
                   {submitting ? (
-                    <ActivityIndicator size="small" color="#ffffff" />
+                    <ModernLoadingIndicator size="mini" color="#ffffff" accentColor="#ffddb8" />
                   ) : (
                     <>
                       <MaterialIcons name="save" size={16} color="#ffffff" />

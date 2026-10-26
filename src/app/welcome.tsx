@@ -124,6 +124,10 @@ export default function BerandaScreen() {
       router.push('/return' as any);
       return;
     }
+    if (menuName === 'Lainnya' || menuName === 'Splash Screen' || menuName === 'Animasi') {
+      router.push('/splash' as any);
+      return;
+    }
     Alert.alert('Menu Operasional', `Fitur ${menuName} sedang dibuka.`, [{ text: 'OK' }]);
   };
 

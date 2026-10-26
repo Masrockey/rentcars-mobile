@@ -2,7 +2,6 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   Animated,
   Modal,
@@ -19,6 +18,7 @@ import { BrandColors } from '@/constants/brand';
 import { BookingService, CreateBookingPayload, Customer, LookupsData, MarketingUser } from '@/services/booking';
 import { StorageService, UserProfile } from '@/services/storage';
 import { CalendarPickerModal } from '@/components/CalendarPickerModal';
+import { ModernLoadingIndicator, ModernLoadingOverlay } from '@/components/ModernLoading';
 
 const PRESET_TIMES = [
   '06:00',
@@ -512,7 +512,7 @@ export default function BookingCreateScreen() {
 
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <Text style={styles.formMainTitle}>Formulir Reservasi Sewa</Text>
-            {loadingLookups && <ActivityIndicator size="small" color={BrandColors.primary} />}
+            {loadingLookups && <ModernLoadingIndicator size="mini" />}
           </View>
           <Text style={styles.formMainSubtitle}>
             Lengkapi data pemesanan unit armada secara akurat untuk validasi kontrak.
@@ -1184,7 +1184,7 @@ export default function BookingCreateScreen() {
             disabled={submitting}
             onPress={handleSaveBooking}>
             {submitting ? (
-              <ActivityIndicator color="#ffffff" size="small" />
+              <ModernLoadingIndicator size="mini" color="#ffffff" accentColor="#ffddb8" />
             ) : (
               <>
                 <MaterialIcons name="check-circle" size={20} color="#ffffff" />
@@ -1615,6 +1615,13 @@ export default function BookingCreateScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Modern Loading Overlay saat menyimpan booking */}
+      <ModernLoadingOverlay
+        visible={submitting}
+        title="Menyimpan Booking"
+        message="Sedang mendaftarkan reservasi unit ke sistem armada CAN..."
+      />
     </SafeAreaView>
   );
 }

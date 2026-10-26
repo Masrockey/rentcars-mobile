@@ -1,6 +1,7 @@
 import { BookingInfoCard } from '@/components/BookingInfoCard';
 import { CalendarPickerModal } from '@/components/CalendarPickerModal';
 import { FuelIndicatorCard } from '@/components/FuelIndicatorCard';
+import { ModernLoadingIndicator } from '@/components/ModernLoading';
 import { BrandColors } from '@/constants/brand';
 import { BookingDetail } from '@/services/booking';
 import { DeliveryPayload, DeliveryReturnService } from '@/services/deliveryReturn';
@@ -10,7 +11,6 @@ import * as Location from 'expo-location';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   FlatList,
   Image,
@@ -739,7 +739,7 @@ export default function DeliveryScreen() {
                   activeOpacity={0.8}
                 >
                   {gpsLoading ? (
-                    <ActivityIndicator size="small" color="#fff" />
+                    <ModernLoadingIndicator size="mini" color="#fff" accentColor="#ffddb8" />
                   ) : (
                     <MaterialIcons name={gpsLocked ? 'verified' : 'my-location'} size={18} color="#fff" />
                   )}
@@ -1322,7 +1322,7 @@ export default function DeliveryScreen() {
             activeOpacity={0.85}
           >
             {submitting ? (
-              <ActivityIndicator size="small" color="#fff" />
+              <ModernLoadingIndicator size="mini" color="#fff" accentColor="#ffddb8" />
             ) : (
               <>
                 <MaterialIcons name="lock" size={20} color="#fff" />
@@ -1612,8 +1612,11 @@ export default function DeliveryScreen() {
       {/* 3. List Content */}
       {loading && !refreshing ? (
         <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color={BrandColors.primary} />
-          <Text style={styles.loadingText}>Memuat data serah terima...</Text>
+          <ModernLoadingIndicator
+            size="large"
+            message="Memuat data serah terima..."
+            submessage="Sinkronisasi jadwal pengiriman armada"
+          />
         </View>
       ) : (
         <FlatList

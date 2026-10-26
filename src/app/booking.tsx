@@ -2,7 +2,6 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   Platform,
   RefreshControl,
@@ -17,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BrandColors } from '@/constants/brand';
 import { BookingDetail, BookingService } from '@/services/booking';
+import { ModernLoadingIndicator } from '@/components/ModernLoading';
 
 const STATUS_FILTERS = [
   { key: 'all', label: 'Semua' },
@@ -229,7 +229,12 @@ export default function BookingListScreen() {
 
         {/* Booking List Feed */}
         {loading ? (
-          <ActivityIndicator size="large" color={BrandColors.primary} style={{ marginVertical: 32 }} />
+          <ModernLoadingIndicator
+            size="medium"
+            message="Memuat data booking armada..."
+            submessage="Sinkronisasi jadwal dengan server"
+            style={{ marginVertical: 32 }}
+          />
         ) : bookings.length > 0 ? (
           bookings.map((item) => {
             const custName = item.customer?.name || item.customer_name || 'A. Fadli Akbar';
