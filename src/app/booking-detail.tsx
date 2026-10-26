@@ -158,19 +158,7 @@ export default function BookingDetailScreen() {
   };
 
   const handleAllocateArmada = () => {
-    Alert.alert(
-      'Alokasi Armada',
-      'Konfirmasi penugasan unit Alphard BK 1088 CAN ke reservasi ini?',
-      [
-        { text: 'Batal', style: 'cancel' },
-        {
-          text: 'Konfirmasi Penugasan',
-          onPress: () => {
-            triggerToast('Unit berhasil dialokasikan!');
-          },
-        },
-      ]
-    );
+    router.push('/allocation' as any);
   };
 
   const formatRupiah = (val?: number | string) => {
@@ -685,20 +673,58 @@ export default function BookingDetailScreen() {
 
       {/* 7. Bottom Sticky Action Dock */}
       <View style={styles.bottomStickyDock}>
-        <TouchableOpacity
-          style={styles.cancelDockBtn}
-          activeOpacity={0.8}
-          onPress={handleCancelBooking}>
-          <Text style={styles.cancelDockBtnText}>Batalkan</Text>
-        </TouchableOpacity>
+        {status !== 'Completed' && status !== 'Cancelled' && (
+          <TouchableOpacity
+            style={styles.cancelDockBtn}
+            activeOpacity={0.8}
+            onPress={handleCancelBooking}>
+            <Text style={styles.cancelDockBtnText}>Batalkan</Text>
+          </TouchableOpacity>
+        )}
 
-        <TouchableOpacity
-          style={styles.allocateDockBtn}
-          activeOpacity={0.85}
-          onPress={handleAllocateArmada}>
-          <Text style={styles.allocateDockBtnText}>Alokasikan Armada</Text>
-          <MaterialIcons name="arrow-forward" size={19} color="#ffffff" />
-        </TouchableOpacity>
+        {status === 'Pending' && (
+          <TouchableOpacity
+            style={styles.allocateDockBtn}
+            activeOpacity={0.85}
+            onPress={handleAllocateArmada}>
+            <Text style={styles.allocateDockBtnText}>Alokasikan Armada</Text>
+            <MaterialIcons name="arrow-forward" size={19} color="#ffffff" />
+          </TouchableOpacity>
+        )}
+
+        {status === 'Confirmed' && (
+          <TouchableOpacity
+            style={[styles.allocateDockBtn, { backgroundColor: BrandColors.primary }]}
+            activeOpacity={0.85}
+            onPress={() => router.push('/delivery' as any)}>
+            <Text style={styles.allocateDockBtnText}>Serah Terima Unit</Text>
+            <MaterialIcons name="handshake" size={19} color="#ffffff" />
+          </TouchableOpacity>
+        )}
+
+        {status === 'On Trip' && (
+          <TouchableOpacity
+            style={[styles.allocateDockBtn, { backgroundColor: BrandColors.secondary }]}
+            activeOpacity={0.85}
+            onPress={() => router.push('/return' as any)}>
+            <Text style={styles.allocateDockBtnText}>Terima Unit Kembali</Text>
+            <MaterialIcons name="swap-horizontal-circle" size={19} color="#ffffff" />
+          </TouchableOpacity>
+        )}
+
+        {(status === 'Completed' || status === 'Returned') && (
+          <View style={[styles.allocateDockBtn, { backgroundColor: '#ecfdf5', borderWidth: 1, borderColor: '#a7f3d0' }]}>
+            <MaterialIcons name="task-alt" size={19} color="#059669" />
+            <Text style={[styles.allocateDockBtnText, { color: '#059669' }]}>Sewa Selesai</Text>
+          </View>
+        )}
+
+        {status === 'Cancelled' && (
+          <View style={[styles.allocateDockBtn, { backgroundColor: '#fef2f2', borderWidth: 1, borderColor: '#fecaca' }]}>
+            <MaterialIcons name="cancel" size={19} color="#dc2626" />
+            <Text style={[styles.allocateDockBtnText, { color: '#dc2626' }]}>Booking Dibatalkan</Text>
+          </View>
+        )}
       </View>
     </SafeAreaView>
   );

@@ -22,6 +22,9 @@ export default function RootLayout() {
         <Stack.Screen name="booking" />
         <Stack.Screen name="booking-detail" />
         <Stack.Screen name="booking-create" />
+        <Stack.Screen name="allocation" />
+        <Stack.Screen name="delivery" />
+        <Stack.Screen name="return" />
         <Stack.Screen name="explore" />
       </Stack>
     </>

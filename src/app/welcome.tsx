@@ -112,6 +112,18 @@ export default function BerandaScreen() {
       router.push('/booking-create' as any);
       return;
     }
+    if (menuName === 'Alokasi' || menuName === 'Alokasi Armada') {
+      router.push('/allocation' as any);
+      return;
+    }
+    if (menuName === 'Serah Unit' || menuName === 'Serah Terima') {
+      router.push('/delivery' as any);
+      return;
+    }
+    if (menuName === 'Kembali' || menuName === 'Unit Kembali' || menuName === 'Pengembalian') {
+      router.push('/return' as any);
+      return;
+    }
     Alert.alert('Menu Operasional', `Fitur ${menuName} sedang dibuka.`, [{ text: 'OK' }]);
   };
 

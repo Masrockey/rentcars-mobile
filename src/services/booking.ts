@@ -81,6 +81,23 @@ export interface BookingDetail {
   payment_method?: string; // 'Cash' | 'Transfer' | 'DP'
   payment_status?: string; // 'Pending' | 'DP Verified' | 'Paid'
   notes?: string | null;
+  car_id?: number | null;
+  customer_id?: number | null;
+  driver_id?: number | null;
+  peluncur_id?: number | null;
+  duration_days?: number;
+  delivery_checklist?: Record<string, any> | null;
+  return_checklist?: Record<string, any> | null;
+  rental?: {
+    id: number;
+    contract_number?: string;
+    km_out?: number;
+    fuel_out?: number;
+    km_in?: number | null;
+    fuel_in?: number | null;
+    fine_amount?: number;
+    status?: string;
+  } | null;
   created_at?: string;
   audit_logs?: {
     id: number;
