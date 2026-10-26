@@ -93,13 +93,13 @@ export default function ReturnScreen() {
   // Checklist 8 Item Kembali
   const [checklists, setChecklists] = useState<Record<string, boolean | null>>({
     kunci_kontak: null,
-    stnk_asli: null,
+    copy_stnk: null,
     ban_serep: null,
-    dongkrak_kit: null,
+    dongkrak: null,
     kunci_roda: null,
     stang_dongkrak: null,
     ac_mobil: null,
-    audio_system: null,
+    audio_mobil: null,
   });
 
   // Inspeksi 5 Sisi Bodi Saat Kembali
@@ -162,13 +162,13 @@ export default function ReturnScreen() {
     });
     setChecklists({
       kunci_kontak: null,
-      stnk_asli: null,
+      copy_stnk: null,
       ban_serep: null,
-      dongkrak_kit: null,
+      dongkrak: null,
       kunci_roda: null,
       stang_dongkrak: null,
       ac_mobil: null,
-      audio_system: null,
+      audio_mobil: null,
     });
     setBodySides({
       depan: { title: 'Tampak Depan', condition: '', note: '' },
@@ -229,24 +229,24 @@ export default function ReturnScreen() {
     if (isAllOk) {
       setChecklists({
         kunci_kontak: null,
-        stnk_asli: null,
+        copy_stnk: null,
         ban_serep: null,
-        dongkrak_kit: null,
+        dongkrak: null,
         kunci_roda: null,
         stang_dongkrak: null,
         ac_mobil: null,
-        audio_system: null,
+        audio_mobil: null,
       });
     } else {
       setChecklists({
         kunci_kontak: true,
-        stnk_asli: true,
+        copy_stnk: true,
         ban_serep: true,
-        dongkrak_kit: true,
+        dongkrak: true,
         kunci_roda: true,
         stang_dongkrak: true,
         ac_mobil: true,
-        audio_system: true,
+        audio_mobil: true,
       });
     }
   };
@@ -501,18 +501,53 @@ export default function ReturnScreen() {
             setSubmitting(true);
             try {
               const now = new Date();
+              const formatCheckVal = (v: boolean | null | undefined): string => {
+                if (v === true) return 'OK';
+                if (v === false) return 'Tidak';
+                return '';
+              };
+
+              const checklistPayload: Record<string, any> = {
+                // 8 Item Standar Sesuai Format Database & PDF BAST ('OK' | 'Tidak')
+                kunci_kontak: formatCheckVal(checklists.kunci_kontak),
+                copy_stnk: formatCheckVal(checklists.copy_stnk),
+                ban_serep: formatCheckVal(checklists.ban_serep),
+                dongkrak: formatCheckVal(checklists.dongkrak),
+                kunci_roda: formatCheckVal(checklists.kunci_roda),
+                stang_dongkrak: formatCheckVal(checklists.stang_dongkrak),
+                ac_mobil: formatCheckVal(checklists.ac_mobil),
+                audio_mobil: formatCheckVal(checklists.audio_mobil),
+
+                // Backward-compatibility aliases
+                stnk_asli: formatCheckVal(checklists.copy_stnk),
+                dongkrak_kit: formatCheckVal(checklists.dongkrak),
+                audio_system: formatCheckVal(checklists.audio_mobil),
+
+                // 5 Sisi Bodi datar untuk web admin & PDF BAST
+                body_depan: bodySides.depan.condition || 'Baik',
+                body_depan_note: bodySides.depan.note || '',
+                body_belakang: bodySides.belakang.condition || 'Baik',
+                body_belakang_note: bodySides.belakang.note || '',
+                body_kiri: bodySides.kiri.condition || 'Baik',
+                body_kiri_note: bodySides.kiri.note || '',
+                body_kanan: bodySides.kanan.condition || 'Baik',
+                body_kanan_note: bodySides.kanan.note || '',
+                body_atap: bodySides.atap.condition || 'Baik',
+                body_atap_note: bodySides.atap.note || '',
+
+                // Metadata & nested body_sides
+                body_sides: bodySides,
+                gps_coordinates: gpsCoord,
+                returned_at: now.toISOString(),
+              };
+
               const payload: ReturnPayload = {
                 km_out: km,
                 fuel_out: fuelPercent,
                 fuel_range_km: parseInt(fuelRangeKm, 10) || Math.round((fuelPercent / 100) * 280),
                 handover_location: returnLocation.trim() || undefined,
                 notes: generalNotes.trim() || undefined,
-                checklist: {
-                  ...checklists,
-                  body_sides: bodySides,
-                  gps_coordinates: gpsCoord,
-                  returned_at: now.toISOString(),
-                },
+                checklist: checklistPayload,
                 photos: unitPhotos.length > 0 ? unitPhotos : undefined,
                 body_depan_photos: sidePhotos.depan.length > 0 ? sidePhotos.depan : undefined,
                 body_kiri_photos: sidePhotos.kiri.length > 0 ? sidePhotos.kiri : undefined,
@@ -797,13 +832,13 @@ export default function ReturnScreen() {
 
               {[
                 { key: 'kunci_kontak', icon: 'vpn-key', label: 'Kunci Kontak Utama & Cadangan' },
-                { key: 'stnk_asli', icon: 'description', label: 'Copy STNK Asli / Pajak Hidup' },
+                { key: 'copy_stnk', icon: 'description', label: 'Copy STNK Asli / Pajak Hidup' },
                 { key: 'ban_serep', icon: 'radio-button-checked', label: 'Ban Serep / Cadangan Standard' },
-                { key: 'dongkrak_kit', icon: 'build', label: 'Dongkrak Kit Set Complete' },
+                { key: 'dongkrak', icon: 'build', label: 'Dongkrak Kit Set Complete' },
                 { key: 'kunci_roda', icon: 'construction', label: 'Kunci Roda Set Tool Package' },
                 { key: 'stang_dongkrak', icon: 'handyman', label: 'Stang Dongkrak Putar' },
                 { key: 'ac_mobil', icon: 'ac-unit', label: 'AC Mobil Dingin & Blower Aktif' },
-                { key: 'audio_system', icon: 'volume-up', label: 'Audio System / Bluetooth Tape' },
+                { key: 'audio_mobil', icon: 'volume-up', label: 'Audio System / Bluetooth Tape' },
               ].map((item, idx, arr) => {
                 const isOk = checklists[item.key] === true;
                 const isNotOk = checklists[item.key] === false;

@@ -15,6 +15,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BrandColors } from '@/constants/brand';
+import { getUserRoleInfo } from '@/utils/roleAccess';
 import { BookingService, CreateBookingPayload, Customer, LookupsData, MarketingUser } from '@/services/booking';
 import { StorageService, UserProfile } from '@/services/storage';
 import { CalendarPickerModal } from '@/components/CalendarPickerModal';
@@ -169,6 +170,18 @@ export default function BookingCreateScreen() {
 
         if (!active) return;
 
+        const roleInfo = getUserRoleInfo(userProfile);
+        if (roleInfo.isPeluncur) {
+          Alert.alert(
+            'Akses Dibatasi',
+            'Role Peluncur hanya memiliki akses untuk modul Serah Terima dan Pengambilan unit.',
+            [
+              { text: 'Buka Serah Terima', onPress: () => router.replace('/delivery') },
+              { text: 'Kembali', onPress: () => router.replace('/welcome') },
+            ]
+          );
+          return;
+        }
         if (userProfile) {
           setCurrentUser(userProfile);
         }

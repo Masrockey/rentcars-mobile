@@ -108,6 +108,50 @@ function sendMultipartRequest(url: string, token: string, formData: FormData): P
   });
 }
 
+/**
+ * Normalisasi data checklist agar kompatibel dengan validasi database backend dan template PDF BAST:
+ * 1. Mengubah boolean true/false menjadi string 'OK'/'Tidak'
+ * 2. Menyinkronkan kunci kanonikal dan alias (copy_stnk <-> stnk_asli, dongkrak <-> dongkrak_kit, audio_mobil <-> audio_system)
+ */
+function normalizeChecklistForBackend(raw: Record<string, any> = {}): Record<string, any> {
+  const result: Record<string, any> = { ...raw };
+
+  const toStatus = (v: any) => {
+    if (v === true || v === 'OK') return 'OK';
+    if (v === false || v === 'Tidak') return 'Tidak';
+    return v === null || v === undefined ? '' : String(v);
+  };
+
+  // Sinkronisasi alias dokumen & perkakas
+  if (result.copy_stnk !== undefined && result.stnk_asli === undefined) {
+    result.stnk_asli = result.copy_stnk;
+  } else if (result.stnk_asli !== undefined && result.copy_stnk === undefined) {
+    result.copy_stnk = result.stnk_asli;
+  }
+
+  if (result.dongkrak !== undefined && result.dongkrak_kit === undefined) {
+    result.dongkrak_kit = result.dongkrak;
+  } else if (result.dongkrak_kit !== undefined && result.dongkrak === undefined) {
+    result.dongkrak = result.dongkrak_kit;
+  }
+
+  if (result.audio_mobil !== undefined && result.audio_system === undefined) {
+    result.audio_system = result.audio_mobil;
+  } else if (result.audio_system !== undefined && result.audio_mobil === undefined) {
+    result.audio_mobil = result.audio_system;
+  }
+
+  // Konversi semua boolean
+  Object.keys(result).forEach((key) => {
+    const val = result[key];
+    if (typeof val === 'boolean') {
+      result[key] = toStatus(val);
+    }
+  });
+
+  return result;
+}
+
 export const DeliveryReturnService = {
   /**
    * Mengambil daftar booking untuk Serah Terima (Delivery)
@@ -222,11 +266,12 @@ export const DeliveryReturnService = {
         if (payload.checkout_time) formData.append('checkout_time', payload.checkout_time);
         if (payload.checkout_datetime) formData.append('checkout_datetime', payload.checkout_datetime);
 
-        Object.entries(payload.checklist || {}).forEach(([k, v]) => {
+        const normalizedChecklist = normalizeChecklistForBackend(payload.checklist);
+        Object.entries(normalizedChecklist).forEach(([k, v]) => {
           if (typeof v === 'object' && v !== null) {
             formData.append(`checklist[${k}]`, JSON.stringify(v));
           } else {
-            formData.append(`checklist[${k}]`, String(v));
+            formData.append(`checklist[${k}]`, v === null || v === undefined ? '' : String(v));
           }
         });
 
@@ -261,6 +306,10 @@ export const DeliveryReturnService = {
 
         json = await sendMultipartRequest(getEndpointUrl(`bookings/${bookingId}/delivery`), token, formData);
       } else {
+        const normalizedPayload = {
+          ...payload,
+          checklist: normalizeChecklistForBackend(payload.checklist),
+        };
         const res = await fetch(getEndpointUrl(`bookings/${bookingId}/delivery`), {
           method: 'POST',
           headers: {
@@ -268,7 +317,7 @@ export const DeliveryReturnService = {
             'Content-Type': 'application/json',
             Accept: 'application/json',
           },
-          body: JSON.stringify(payload),
+          body: JSON.stringify(normalizedPayload),
         });
         json = await res.json();
         if (!res.ok) {
@@ -397,11 +446,12 @@ export const DeliveryReturnService = {
         if (payload.handover_location) formData.append('handover_location', payload.handover_location);
         if (payload.notes) formData.append('notes', payload.notes);
 
-        Object.entries(payload.checklist || {}).forEach(([k, v]) => {
+        const normalizedChecklist = normalizeChecklistForBackend(payload.checklist);
+        Object.entries(normalizedChecklist).forEach(([k, v]) => {
           if (typeof v === 'object' && v !== null) {
             formData.append(`checklist[${k}]`, JSON.stringify(v));
           } else {
-            formData.append(`checklist[${k}]`, String(v));
+            formData.append(`checklist[${k}]`, v === null || v === undefined ? '' : String(v));
           }
         });
 
@@ -433,6 +483,10 @@ export const DeliveryReturnService = {
 
         json = await sendMultipartRequest(getEndpointUrl(`bookings/${bookingId}/return`), token, formData);
       } else {
+        const normalizedPayload = {
+          ...payload,
+          checklist: normalizeChecklistForBackend(payload.checklist),
+        };
         const res = await fetch(getEndpointUrl(`bookings/${bookingId}/return`), {
           method: 'POST',
           headers: {
@@ -440,7 +494,7 @@ export const DeliveryReturnService = {
             'Content-Type': 'application/json',
             Accept: 'application/json',
           },
-          body: JSON.stringify(payload),
+          body: JSON.stringify(normalizedPayload),
         });
         json = await res.json();
         if (!res.ok) {

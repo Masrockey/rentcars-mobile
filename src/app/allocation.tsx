@@ -18,6 +18,8 @@ import { BrandColors } from '@/constants/brand';
 import { BookingDetail, Car, Driver } from '@/services/booking';
 import { AllocationService, BlacklistRecord } from '@/services/allocation';
 import { ModernLoadingIndicator } from '@/components/ModernLoading';
+import { StorageService } from '@/services/storage';
+import { getUserRoleInfo } from '@/utils/roleAccess';
 
 const { width } = Dimensions.get('window');
 
@@ -33,6 +35,7 @@ export default function AllocationScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [accessDenied, setAccessDenied] = useState(false);
 
   // Counters
   const [totalCount, setTotalCount] = useState(0);
@@ -98,17 +101,37 @@ export default function AllocationScreen() {
 
   useEffect(() => {
     let active = true;
-    const timer = setTimeout(() => {
+    (async () => {
+      const user = await StorageService.getUser();
+      const roleInfo = getUserRoleInfo(user);
+
+      if (!roleInfo.canAccessAllocation) {
+        if (active) {
+          setAccessDenied(true);
+          setLoading(false);
+        }
+        Alert.alert(
+          'Akses Dibatasi',
+          'Role Anda tidak memiliki izin untuk mengakses modul Alokasi Armada.',
+          [
+            {
+              text: 'Kembali ke Beranda',
+              onPress: () => router.replace('/welcome'),
+            },
+          ]
+        );
+        return;
+      }
+
       if (active) {
         loadData();
       }
-    }, 300);
+    })();
 
     return () => {
       active = false;
-      clearTimeout(timer);
     };
-  }, [loadData]);
+  }, [loadData, router]);
 
   const onRefresh = () => {
     loadData(true);
@@ -257,6 +280,42 @@ export default function AllocationScreen() {
   const currentlySelectedCar = useMemo(() => {
     return availableCarOptions.find((c) => c.id === selectedCarId);
   }, [availableCarOptions, selectedCarId]);
+
+  if (accessDenied) {
+    return (
+      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+        <View style={styles.topHeader}>
+          <TouchableOpacity
+            style={styles.backButton}
+            activeOpacity={0.7}
+            onPress={() => router.replace('/welcome')}>
+            <MaterialIcons name="arrow-back" size={24} color={BrandColors.onSurface} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Alokasi Armada</Text>
+        </View>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+          <MaterialIcons name="gpp-bad" size={64} color="#dc2626" />
+          <Text style={{ fontSize: 18, fontWeight: '700', color: BrandColors.onSurface, marginTop: 16 }}>
+            Akses Dibatasi
+          </Text>
+          <Text style={{ fontSize: 14, color: BrandColors.onSurfaceVariant, textAlign: 'center', marginTop: 8, lineHeight: 20 }}>
+            Halaman Alokasi Armada hanya dapat diakses oleh Administrator. Role Peluncur dan Marketing tidak diizinkan membuka modul ini.
+          </Text>
+          <TouchableOpacity
+            style={{
+              marginTop: 24,
+              backgroundColor: BrandColors.primary,
+              paddingVertical: 12,
+              paddingHorizontal: 24,
+              borderRadius: 12,
+            }}
+            onPress={() => router.replace('/welcome')}>
+            <Text style={{ color: '#fff', fontWeight: '700' }}>Kembali ke Beranda</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>

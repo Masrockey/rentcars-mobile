@@ -19,31 +19,38 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BrandColors } from '@/constants/brand';
 import { AuthService } from '@/services/auth';
+import { BookingDetail } from '@/services/booking';
 import {
   BookingItem,
   DashboardService,
   DashboardSummary,
 } from '@/services/dashboard';
+import { DeliveryReturnService } from '@/services/deliveryReturn';
 import { StorageService, UserProfile } from '@/services/storage';
+import { getUserRoleInfo } from '@/utils/roleAccess';
 
 export default function BerandaScreen() {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [bookings, setBookings] = useState<BookingItem[]>([]);
+  const [deliveryTasks, setDeliveryTasks] = useState<BookingDetail[]>([]);
   const [pendingCount, setPendingCount] = useState<number>(0);
   const [refreshing, setRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'beranda' | 'booking' | 'armada' | 'setelan'>('beranda');
+  const [activeTab, setActiveTab] = useState<'beranda' | 'booking' | 'armada' | 'serah_unit' | 'kembali' | 'konsumen' | 'setelan'>('beranda');
   const [showProfileModal, setShowProfileModal] = useState(false);
+
+  const roleInfo = getUserRoleInfo(user);
 
   useEffect(() => {
     let active = true;
     (async () => {
       try {
-        const [storedUser, dashData, bookingsRes, pendingTotal] = await Promise.all([
+        const [storedUser, dashData, bookingsRes, pendingTotal, deliveryRes] = await Promise.all([
           StorageService.getUser(),
           DashboardService.getDashboardData(),
           DashboardService.getRecentBookings(5),
           DashboardService.getPendingCount(),
+          DeliveryReturnService.getDeliveryList({ tab: 'all', per_page: 15 }).catch(() => null),
         ]);
 
         if (active) {
@@ -51,6 +58,19 @@ export default function BerandaScreen() {
           if (dashData) setSummary(dashData);
           if (bookingsRes?.items) setBookings(bookingsRes.items);
           setPendingCount(pendingTotal);
+
+          if (deliveryRes?.items) {
+            // Urutkan: unit yang siap diserahkan (Confirmed / belum checklist) di urutan teratas, diikuti On Trip
+            const readyItems = deliveryRes.items.filter(
+              (b) => b.status === 'Confirmed' || (b.status === 'Pending' && b.car_id && !b.delivery_checklist)
+            );
+            const onTripItems = deliveryRes.items.filter((b) => b.status === 'On Trip');
+            const otherTasks = deliveryRes.items.filter(
+              (b) => !readyItems.includes(b) && !onTripItems.includes(b)
+            );
+            const sortedTasks = [...readyItems, ...onTripItems, ...otherTasks];
+            setDeliveryTasks(sortedTasks.slice(0, 5));
+          }
         }
       } catch (err: any) {
         console.warn('[BERANDA] Error loading real data:', err?.message);
@@ -64,16 +84,29 @@ export default function BerandaScreen() {
   const onRefresh = async () => {
     setRefreshing(true);
     try {
-      const [storedUser, dashData, bookingsRes, pendingTotal] = await Promise.all([
+      const [storedUser, dashData, bookingsRes, pendingTotal, deliveryRes] = await Promise.all([
         StorageService.getUser(),
         DashboardService.getDashboardData(),
         DashboardService.getRecentBookings(5),
         DashboardService.getPendingCount(),
+        DeliveryReturnService.getDeliveryList({ tab: 'all', per_page: 15 }).catch(() => null),
       ]);
       if (storedUser) setUser(storedUser);
       if (dashData) setSummary(dashData);
       if (bookingsRes?.items) setBookings(bookingsRes.items);
       setPendingCount(pendingTotal);
+
+      if (deliveryRes?.items) {
+        const readyItems = deliveryRes.items.filter(
+          (b) => b.status === 'Confirmed' || (b.status === 'Pending' && b.car_id && !b.delivery_checklist)
+        );
+        const onTripItems = deliveryRes.items.filter((b) => b.status === 'On Trip');
+        const otherTasks = deliveryRes.items.filter(
+          (b) => !readyItems.includes(b) && !onTripItems.includes(b)
+        );
+        const sortedTasks = [...readyItems, ...onTripItems, ...otherTasks];
+        setDeliveryTasks(sortedTasks.slice(0, 5));
+      }
     } catch (err: any) {
       console.warn('[BERANDA] Error refreshing real data:', err?.message);
     } finally {
@@ -104,6 +137,40 @@ export default function BerandaScreen() {
   };
 
   const handleMenuClick = (menuName: string) => {
+    // PROTEKSI AKSES: Peluncur & Marketing DILARANG mengakses Alokasi dan Data Mobil
+    if (
+      menuName.includes('Alokasi') ||
+      menuName.includes('Data Mobil') ||
+      menuName.includes('Armada')
+    ) {
+      if (!roleInfo.canAccessAllocation && menuName.includes('Alokasi')) {
+        Alert.alert(
+          'Akses Dibatasi',
+          'Role Anda tidak memiliki izin untuk mengakses modul Alokasi Armada. Silakan hubungi Administrator.'
+        );
+        return;
+      }
+      if (!roleInfo.canAccessCars && (menuName.includes('Mobil') || menuName.includes('Armada'))) {
+        Alert.alert(
+          'Akses Dibatasi',
+          'Role Anda tidak memiliki izin untuk mengakses data mobil dan armada. Silakan hubungi Administrator.'
+        );
+        return;
+      }
+    }
+
+    // PROTEKSI AKSES: Peluncur DILARANG mengakses modul Booking & Buat Booking
+    if (
+      roleInfo.isPeluncur &&
+      (menuName.includes('Booking') || menuName === 'Baru' || menuName === 'Buat Booking Baru')
+    ) {
+      Alert.alert(
+        'Akses Dibatasi',
+        'Role Peluncur hanya memiliki akses untuk modul Serah Terima dan Pengambilan unit.'
+      );
+      return;
+    }
+
     if (menuName === 'Booking' || menuName === 'Halaman Booking' || menuName === 'Lihat Semua Booking') {
       router.push('/booking' as any);
       return;
@@ -159,43 +226,7 @@ export default function BerandaScreen() {
 
   const fullUserName = user?.name || 'Pengguna';
 
-  const userRoles = (user?.roles || []).map((r) => String(r).toLowerCase().trim());
-  const isSuperAdmin = Boolean(
-    user?.is_super_admin ||
-    userRoles.includes('super admin') ||
-    userRoles.includes('superadmin')
-  );
-  const isAdmin = Boolean(
-    isSuperAdmin ||
-    user?.is_admin ||
-    userRoles.includes('admin')
-  );
-  const isMarketing = Boolean(
-    !isAdmin && (
-      user?.is_marketing ||
-      userRoles.includes('marketing')
-    )
-  );
-  const isPeluncur = Boolean(
-    !isAdmin && (
-      user?.is_peluncur ||
-      userRoles.includes('peluncur')
-    )
-  );
-  const isDriver = Boolean(
-    !isAdmin && (
-      user?.is_driver ||
-      userRoles.includes('driver') ||
-      userRoles.includes('supir')
-    )
-  );
-  const isPetugasCuci = Boolean(
-    !isAdmin && (
-      user?.is_petugas_cuci ||
-      userRoles.includes('petugas cuci') ||
-      userRoles.includes('petugascuci')
-    )
-  );
+  const { isAdmin, isMarketing, isPeluncur, isDriver, isPetugasCuci } = roleInfo;
 
   interface MenuItem {
     id: string;
@@ -336,14 +367,6 @@ export default function BerandaScreen() {
               onPress: () => router.push('/booking-create' as any),
             },
             {
-              id: 'tarif',
-              title: 'Tarif Sewa',
-              icon: 'style',
-              circleBg: 'rgba(219,225,255,0.7)',
-              iconColor: BrandColors.tertiary,
-              onPress: () => handleMenuClick('Tarif Sewa'),
-            },
-            {
               id: 'pelanggan',
               title: 'Konsumen',
               icon: 'people',
@@ -357,40 +380,27 @@ export default function BerandaScreen() {
     }
 
     // 3. PELUNCUR: Serah terima & pengembalian unit
+    // DILARANG MENGAKSES ALOKASI & DATA MOBIL
     if (isPeluncur) {
       return [
         {
-          title: 'Tugas Operasional',
+          title: 'Tugas Operasional Peluncur',
           items: [
             {
-              id: 'booking',
-              title: 'Tugas Saya',
-              icon: 'calendar-month',
+              id: 'serah_unit',
+              title: 'Serah Terima',
+              icon: 'handshake',
               circleBg: 'rgba(204,229,255,0.7)',
               iconColor: BrandColors.primary,
-              onPress: () => handleMenuClick('Booking'),
-            },
-            {
-              id: 'serah_unit',
-              title: 'Serah Unit',
-              icon: 'handshake',
-              circleBg: 'rgba(219,225,255,0.7)',
-              iconColor: BrandColors.tertiary,
               onPress: () => handleMenuClick('Serah Unit'),
             },
             {
               id: 'kembali',
-              title: 'Kembali',
+              title: 'Pengambilan',
               icon: 'swap-horizontal-circle',
-              circleBg: BrandColors.surfaceContainerHigh,
-              iconColor: BrandColors.primary,
+              circleBg: 'rgba(255,221,184,0.6)',
+              iconColor: BrandColors.secondary,
               onPress: () => handleMenuClick('Kembali'),
-            },
-            {
-              id: 'data_mobil',
-              title: 'Data Mobil',
-              icon: 'directions-car',
-              onPress: () => handleMenuClick('Data Mobil'),
             },
           ],
         },
@@ -611,132 +621,256 @@ export default function BerandaScreen() {
           </View>
         </View>
 
-        {/* 5. Booking Terbaru (Real Data from Laravel API) */}
+        {/* 5. Tugas Serah Terima (Role Peluncur) ATAU Booking Terbaru (Role Lainnya) */}
         <View style={styles.sectionContainer}>
           <View style={styles.sectionHeader}>
             <View style={styles.sectionTitleRow}>
-              <View style={[styles.titleBar, { backgroundColor: BrandColors.secondaryContainer }]} />
-              <Text style={styles.sectionTitle}>Booking Terbaru</Text>
+              <View
+                style={[
+                  styles.titleBar,
+                  { backgroundColor: roleInfo.isPeluncur ? BrandColors.primary : BrandColors.secondaryContainer },
+                ]}
+              />
+              <Text style={styles.sectionTitle}>
+                {roleInfo.isPeluncur ? 'Tugas Serah Terima' : 'Booking Terbaru'}
+              </Text>
             </View>
             <TouchableOpacity
               style={styles.seeAllRow}
-              onPress={() => handleMenuClick('Lihat Semua Booking')}>
+              onPress={() => (roleInfo.isPeluncur ? router.push('/delivery' as any) : handleMenuClick('Lihat Semua Booking'))}>
               <Text style={styles.sectionActionText}>Lihat Semua</Text>
               <MaterialIcons name="chevron-right" size={16} color={BrandColors.primary} />
             </TouchableOpacity>
           </View>
 
-          {/* Render real bookings if available */}
-          {bookings.length > 0 ? (
-            bookings.map((item) => {
-              const custName = item.customer?.name || item.customer_name || 'Pelanggan';
-              const code = item.booking_code || item.booking_number || item.code || `#BK-${item.id}`;
-              const carTitle = item.car?.name || (item.car?.brand ? `${item.car.brand} ${item.car.model}` : item.car_type) || 'Unit Armada';
-              const plate = item.car?.plate_number || item.plate_number || 'Belum Ditentukan';
-              const statusColors = getStatusColor(item.status);
+          {/* Render daftar tugas serah terima khusus role Peluncur */}
+          {roleInfo.isPeluncur ? (
+            deliveryTasks.length > 0 ? (
+              deliveryTasks.map((item) => {
+                const custName = item.customer?.name || item.customer_name || 'Pelanggan';
+                const code = item.booking_code || item.booking_number || item.code || `#BK-${item.id}`;
+                const carTitle = item.car?.name || (item.car?.brand ? `${item.car.brand} ${item.car.model}` : item.car_type) || 'Unit Armada';
+                const plate = item.car?.plate_number || item.plate_number || 'Belum Ditentukan';
+                const isReadyHandover = item.status === 'Confirmed' || (item.status === 'Pending' && item.car_id && !item.delivery_checklist);
+                const isOnTrip = item.status === 'On Trip';
 
-              return (
-                <View key={item.id} style={styles.bookingCard}>
-                  <View style={styles.bookingCardHeader}>
-                    <View style={styles.customerRow}>
-                      <View style={[styles.avatarCircle, { backgroundColor: BrandColors.primaryFixed }]}>
-                        <Text style={[styles.avatarText, { color: BrandColors.primary }]}>
-                          {getCustomerInitials(custName)}
+                return (
+                  <View key={item.id} style={styles.bookingCard}>
+                    <View style={styles.bookingCardHeader}>
+                      <View style={styles.customerRow}>
+                        <View style={[styles.avatarCircle, { backgroundColor: isReadyHandover ? '#dcfce7' : BrandColors.primaryFixed }]}>
+                          <Text style={[styles.avatarText, { color: isReadyHandover ? '#15803d' : BrandColors.primary }]}>
+                            {getCustomerInitials(custName)}
+                          </Text>
+                        </View>
+                        <View>
+                          <Text style={styles.customerName}>{custName}</Text>
+                          <Text style={styles.bookingCode}>{code}</Text>
+                        </View>
+                      </View>
+
+                      <View
+                        style={[
+                          styles.statusBadgePill,
+                          {
+                            backgroundColor: isReadyHandover ? '#dcfce7' : isOnTrip ? '#e0f2fe' : BrandColors.surfaceContainerHigh,
+                          },
+                        ]}>
+                        <Text
+                          style={[
+                            styles.statusBadgePillText,
+                            {
+                              color: isReadyHandover ? '#15803d' : isOnTrip ? '#0369a1' : BrandColors.onSurfaceVariant,
+                            },
+                          ]}>
+                          {isReadyHandover ? 'SIAP SERAH' : isOnTrip ? 'ON TRIP' : item.status.toUpperCase()}
                         </Text>
                       </View>
-                      <View>
-                        <Text style={styles.customerName}>{custName}</Text>
-                        <Text style={styles.bookingCode}>{code}</Text>
+                    </View>
+
+                    <View style={styles.bookingDivider} />
+
+                    <View style={styles.bookingDetailsRow}>
+                      <View style={styles.bookingDetailCol}>
+                        <Text style={styles.bookingDetailLabel}>Unit Kendaraan</Text>
+                        <Text style={styles.bookingDetailCar}>{carTitle}</Text>
+                        <View style={styles.plateTag}>
+                          <Text style={styles.plateText}>{plate}</Text>
+                        </View>
+                      </View>
+
+                      <View style={styles.bookingDetailCol}>
+                        <Text style={styles.bookingDetailLabel}>Jadwal Serah Terima</Text>
+                        <View style={styles.periodRow}>
+                          <MaterialIcons name="schedule" size={13} color={BrandColors.primary} />
+                          <Text style={styles.periodText}>{item.booking_date}</Text>
+                        </View>
+                        <Text style={styles.timeText}>
+                          {item.pickup_time ? `${item.pickup_time} WIB` : '08:00 WIB'} • {item.pickup_location || 'Pool Utama'}
+                        </Text>
                       </View>
                     </View>
 
-                    <View style={[styles.statusBadgePill, { backgroundColor: statusColors.bg }]}>
-                      <Text style={[styles.statusBadgePillText, { color: statusColors.text }]}>
-                        {item.status.toUpperCase()}
-                      </Text>
+                    <View style={styles.bookingActionsRow}>
+                      <TouchableOpacity
+                        style={[
+                          styles.primaryActionButton,
+                          { backgroundColor: isReadyHandover ? '#059669' : isOnTrip ? BrandColors.secondary : BrandColors.primary },
+                        ]}
+                        onPress={() => {
+                          if (isOnTrip) {
+                            router.push({ pathname: '/return' as any, params: { id: String(item.id) } });
+                          } else {
+                            router.push({ pathname: '/delivery' as any, params: { id: String(item.id) } });
+                          }
+                        }}
+                        activeOpacity={0.85}>
+                        <MaterialIcons
+                          name={isReadyHandover ? 'handshake' : isOnTrip ? 'swap-horizontal-circle' : 'assignment'}
+                          size={15}
+                          color="#ffffff"
+                          style={{ marginRight: 4 }}
+                        />
+                        <Text style={styles.primaryActionText}>
+                          {isReadyHandover ? 'Serah Terima Unit' : isOnTrip ? 'Penerimaan Kembali' : 'Periksa Tugas'}
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.secondaryActionButton}
+                        onPress={() => router.push({ pathname: '/booking-detail' as any, params: { id: String(item.id) } })}
+                        activeOpacity={0.75}>
+                        <Text style={styles.secondaryActionText}>Detail</Text>
+                      </TouchableOpacity>
                     </View>
                   </View>
-
-                  <View style={styles.bookingDivider} />
-
-                  <View style={styles.bookingDetailsRow}>
-                    <View style={styles.bookingDetailCol}>
-                      <Text style={styles.bookingDetailLabel}>Unit Kendaraan</Text>
-                      <Text style={styles.bookingDetailCar}>{carTitle}</Text>
-                      <View style={styles.plateTag}>
-                        <Text style={styles.plateText}>{plate}</Text>
-                      </View>
-                    </View>
-
-                    <View style={styles.bookingDetailCol}>
-                      <Text style={styles.bookingDetailLabel}>Periode Rental</Text>
-                      <View style={styles.periodRow}>
-                        <MaterialIcons name="schedule" size={13} color={BrandColors.primary} />
-                        <Text style={styles.periodText}>{item.booking_date} — {item.return_date}</Text>
-                      </View>
-                      <Text style={styles.timeText}>
-                        {item.pickup_time ? `${item.pickup_time} sd ${item.return_time || '-'}` : (item.rental_type || 'Lepas Kunci')}
-                      </Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.bookingActionsRow}>
-                    <TouchableOpacity
-                      style={styles.primaryActionButton}
-                      onPress={() => router.push({ pathname: '/booking-detail' as any, params: { id: String(item.id) } })}
-                      activeOpacity={0.85}>
-                      <Text style={styles.primaryActionText}>
-                        {item.status.toLowerCase().includes('pending')
-                          ? 'Alokasikan Unit'
-                          : item.status.toLowerCase().includes('confirmed')
-                            ? 'Serah Terima'
-                            : 'Kelola'}
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.secondaryActionButton}
-                      onPress={() => router.push({ pathname: '/booking-detail' as any, params: { id: String(item.id) } })}
-                      activeOpacity={0.75}>
-                      <Text style={styles.secondaryActionText}>Detail</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              );
-            })
+                );
+              })
+            ) : (
+              <View style={styles.emptyBookingsCard}>
+                <MaterialIcons name="handshake" size={38} color={BrandColors.primary} />
+                <Text style={styles.emptyBookingsText}>Belum ada tugas serah terima aktif saat ini.</Text>
+                <TouchableOpacity
+                  style={[styles.emptyCreateBtn, { backgroundColor: BrandColors.primary }]}
+                  onPress={() => router.push('/delivery' as any)}>
+                  <Text style={styles.emptyCreateBtnText}>Buka Riwayat & Jadwal Serah Terima</Text>
+                </TouchableOpacity>
+              </View>
+            )
           ) : (
-            <View style={styles.emptyBookingsCard}>
-              <MaterialIcons name="receipt-long" size={36} color={BrandColors.outline} />
-              <Text style={styles.emptyBookingsText}>Belum ada data pemesanan terbaru.</Text>
-              <TouchableOpacity
-                style={styles.emptyCreateBtn}
-                onPress={() => handleMenuClick('Buat Booking Baru')}>
-                <Text style={styles.emptyCreateBtnText}>+ Buat Booking Baru</Text>
-              </TouchableOpacity>
-            </View>
+            /* Render Booking Terbaru untuk Admin / Marketing / Role lainnya */
+            bookings.length > 0 ? (
+              bookings.map((item) => {
+                const custName = item.customer?.name || item.customer_name || 'Pelanggan';
+                const code = item.booking_code || item.booking_number || item.code || `#BK-${item.id}`;
+                const carTitle = item.car?.name || (item.car?.brand ? `${item.car.brand} ${item.car.model}` : item.car_type) || 'Unit Armada';
+                const plate = item.car?.plate_number || item.plate_number || 'Belum Ditentukan';
+                const statusColors = getStatusColor(item.status);
+
+                return (
+                  <View key={item.id} style={styles.bookingCard}>
+                    <View style={styles.bookingCardHeader}>
+                      <View style={styles.customerRow}>
+                        <View style={[styles.avatarCircle, { backgroundColor: BrandColors.primaryFixed }]}>
+                          <Text style={[styles.avatarText, { color: BrandColors.primary }]}>
+                            {getCustomerInitials(custName)}
+                          </Text>
+                        </View>
+                        <View>
+                          <Text style={styles.customerName}>{custName}</Text>
+                          <Text style={styles.bookingCode}>{code}</Text>
+                        </View>
+                      </View>
+
+                      <View style={[styles.statusBadgePill, { backgroundColor: statusColors.bg }]}>
+                        <Text style={[styles.statusBadgePillText, { color: statusColors.text }]}>
+                          {item.status.toUpperCase()}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.bookingDivider} />
+
+                    <View style={styles.bookingDetailsRow}>
+                      <View style={styles.bookingDetailCol}>
+                        <Text style={styles.bookingDetailLabel}>Unit Kendaraan</Text>
+                        <Text style={styles.bookingDetailCar}>{carTitle}</Text>
+                        <View style={styles.plateTag}>
+                          <Text style={styles.plateText}>{plate}</Text>
+                        </View>
+                      </View>
+
+                      <View style={styles.bookingDetailCol}>
+                        <Text style={styles.bookingDetailLabel}>Periode Rental</Text>
+                        <View style={styles.periodRow}>
+                          <MaterialIcons name="schedule" size={13} color={BrandColors.primary} />
+                          <Text style={styles.periodText}>{item.booking_date} — {item.return_date}</Text>
+                        </View>
+                        <Text style={styles.timeText}>
+                          {item.pickup_time ? `${item.pickup_time} sd ${item.return_time || '-'}` : (item.rental_type || 'Lepas Kunci')}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.bookingActionsRow}>
+                      <TouchableOpacity
+                        style={styles.primaryActionButton}
+                        onPress={() => router.push({ pathname: '/booking-detail' as any, params: { id: String(item.id) } })}
+                        activeOpacity={0.85}>
+                        <Text style={styles.primaryActionText}>
+                          {item.status.toLowerCase().includes('pending')
+                            ? (roleInfo.canAccessAllocation ? 'Alokasikan Unit' : 'Detail Reservasi')
+                            : item.status.toLowerCase().includes('confirmed')
+                              ? 'Serah Terima'
+                              : 'Kelola'}
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.secondaryActionButton}
+                        onPress={() => router.push({ pathname: '/booking-detail' as any, params: { id: String(item.id) } })}
+                        activeOpacity={0.75}>
+                        <Text style={styles.secondaryActionText}>Detail</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                );
+              })
+            ) : (
+              <View style={styles.emptyBookingsCard}>
+                <MaterialIcons name="receipt-long" size={36} color={BrandColors.outline} />
+                <Text style={styles.emptyBookingsText}>Belum ada data pemesanan terbaru.</Text>
+                <TouchableOpacity
+                  style={styles.emptyCreateBtn}
+                  onPress={() => handleMenuClick('Buat Booking Baru')}>
+                  <Text style={styles.emptyCreateBtnText}>+ Buat Booking Baru</Text>
+                </TouchableOpacity>
+              </View>
+            )
           )}
         </View>
 
-        {/* 6. Jadwal Servis Berkala Notice (Real data from Laravel) */}
-        <View style={styles.serviceNoticeCard}>
-          <View style={styles.serviceNoticeLeft}>
-            <View style={styles.serviceIconWrap}>
-              <MaterialIcons name="build-circle" size={20} color={BrandColors.primary} />
+        {/* 6. Jadwal Servis Berkala Notice (Hanya untuk Admin / Manajemen Armada) */}
+        {roleInfo.canAccessCars && (
+          <View style={styles.serviceNoticeCard}>
+            <View style={styles.serviceNoticeLeft}>
+              <View style={styles.serviceIconWrap}>
+                <MaterialIcons name="build-circle" size={20} color={BrandColors.primary} />
+              </View>
+              <View>
+                <Text style={styles.serviceTitle}>Jadwal Servis Berkala</Text>
+                <Text style={styles.serviceSubtitle}>
+                  {summary ? (summary.service_due ?? 0) : 0} unit armada jatuh tempo servis
+                </Text>
+              </View>
             </View>
-            <View>
-              <Text style={styles.serviceTitle}>Jadwal Servis Berkala</Text>
-              <Text style={styles.serviceSubtitle}>
-                {summary ? (summary.service_due ?? 0) : 0} unit armada jatuh tempo servis
-              </Text>
-            </View>
-          </View>
 
-          <TouchableOpacity
-            style={styles.serviceArrowBtn}
-            onPress={() => handleMenuClick('Jadwal Servis')}
-            activeOpacity={0.75}>
-            <MaterialIcons name="arrow-forward" size={18} color={BrandColors.onSurface} />
-          </TouchableOpacity>
-        </View>
+            <TouchableOpacity
+              style={styles.serviceArrowBtn}
+              onPress={() => handleMenuClick('Jadwal Servis')}
+              activeOpacity={0.75}>
+              <MaterialIcons name="arrow-forward" size={18} color={BrandColors.onSurface} />
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Space at the bottom for floating navigation bar */}
         <View style={{ height: 95 }} />
@@ -764,60 +898,139 @@ export default function BerandaScreen() {
             </Text>
           </TouchableOpacity>
 
-          {/* Tab 2: Booking */}
-          <TouchableOpacity
-            style={styles.navTabItem}
-            onPress={() => {
-              setActiveTab('booking');
-              handleMenuClick('Halaman Booking');
-            }}
-            activeOpacity={0.7}>
-            <MaterialIcons
-              name="receipt-long"
-              size={22}
-              color={activeTab === 'booking' ? BrandColors.primary : BrandColors.onSurfaceVariant}
-            />
-            <Text
-              style={[
-                styles.navTabLabel,
-                activeTab === 'booking' && styles.navTabLabelActive,
-              ]}>
-              Booking
-            </Text>
-          </TouchableOpacity>
+          {/* Tab 2: Serah Terima (Peluncur) ATAU Booking (Role lainnya) */}
+          {roleInfo.isPeluncur ? (
+            <TouchableOpacity
+              style={styles.navTabItem}
+              onPress={() => {
+                setActiveTab('serah_unit');
+                router.push('/delivery' as any);
+              }}
+              activeOpacity={0.7}>
+              <MaterialIcons
+                name="handshake"
+                size={22}
+                color={activeTab === 'serah_unit' ? BrandColors.primary : BrandColors.onSurfaceVariant}
+              />
+              <Text
+                style={[
+                  styles.navTabLabel,
+                  activeTab === 'serah_unit' && styles.navTabLabelActive,
+                ]}>
+                Serah Terima
+              </Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={styles.navTabItem}
+              onPress={() => {
+                setActiveTab('booking');
+                handleMenuClick('Halaman Booking');
+              }}
+              activeOpacity={0.7}>
+              <MaterialIcons
+                name="receipt-long"
+                size={22}
+                color={activeTab === 'booking' ? BrandColors.primary : BrandColors.onSurfaceVariant}
+              />
+              <Text
+                style={[
+                  styles.navTabLabel,
+                  activeTab === 'booking' && styles.navTabLabelActive,
+                ]}>
+                Booking
+              </Text>
+            </TouchableOpacity>
+          )}
 
-          {/* Center Elevated FAB */}
+          {/* Center Elevated FAB: BAST untuk Peluncur, Baru untuk Role lainnya */}
           <View style={styles.centerFabWrapper}>
             <TouchableOpacity
               style={styles.centerFabButton}
               activeOpacity={0.85}
-              onPress={() => handleMenuClick('Buat Booking Baru')}>
-              <Ionicons name="add" size={28} color="#ffffff" />
+              onPress={() => {
+                if (roleInfo.isPeluncur) {
+                  router.push('/delivery' as any);
+                } else {
+                  handleMenuClick('Buat Booking Baru');
+                }
+              }}>
+              <Ionicons
+                name={roleInfo.isPeluncur ? 'clipboard-outline' : 'add'}
+                size={roleInfo.isPeluncur ? 24 : 28}
+                color="#ffffff"
+              />
             </TouchableOpacity>
-            <Text style={styles.centerFabLabel}>Baru</Text>
+            <Text style={styles.centerFabLabel}>
+              {roleInfo.isPeluncur ? 'BAST' : 'Baru'}
+            </Text>
           </View>
 
-          {/* Tab 3: Armada */}
-          <TouchableOpacity
-            style={styles.navTabItem}
-            onPress={() => {
-              setActiveTab('armada');
-              handleMenuClick('Halaman Armada');
-            }}
-            activeOpacity={0.7}>
-            <MaterialIcons
-              name="commute"
-              size={22}
-              color={activeTab === 'armada' ? BrandColors.primary : BrandColors.onSurfaceVariant}
-            />
-            <Text
-              style={[
-                styles.navTabLabel,
-                activeTab === 'armada' && styles.navTabLabelActive,
-              ]}>
-              Armada
-            </Text>
-          </TouchableOpacity>
+          {/* Tab 3: Pengambilan (Peluncur), Konsumen (Marketing), atau Armada (Admin) */}
+          {roleInfo.isPeluncur ? (
+            <TouchableOpacity
+              style={styles.navTabItem}
+              onPress={() => {
+                setActiveTab('kembali');
+                router.push('/return' as any);
+              }}
+              activeOpacity={0.7}>
+              <MaterialIcons
+                name="swap-horizontal-circle"
+                size={22}
+                color={activeTab === 'kembali' ? BrandColors.primary : BrandColors.onSurfaceVariant}
+              />
+              <Text
+                style={[
+                  styles.navTabLabel,
+                  activeTab === 'kembali' && styles.navTabLabelActive,
+                ]}>
+                Pengambilan
+              </Text>
+            </TouchableOpacity>
+          ) : roleInfo.isMarketing ? (
+            <TouchableOpacity
+              style={styles.navTabItem}
+              onPress={() => {
+                setActiveTab('konsumen');
+                handleMenuClick('Data Konsumen');
+              }}
+              activeOpacity={0.7}>
+              <MaterialIcons
+                name="people"
+                size={22}
+                color={activeTab === 'konsumen' ? BrandColors.primary : BrandColors.onSurfaceVariant}
+              />
+              <Text
+                style={[
+                  styles.navTabLabel,
+                  activeTab === 'konsumen' && styles.navTabLabelActive,
+                ]}>
+                Konsumen
+              </Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={styles.navTabItem}
+              onPress={() => {
+                setActiveTab('armada');
+                handleMenuClick('Halaman Armada');
+              }}
+              activeOpacity={0.7}>
+              <MaterialIcons
+                name="commute"
+                size={22}
+                color={activeTab === 'armada' ? BrandColors.primary : BrandColors.onSurfaceVariant}
+              />
+              <Text
+                style={[
+                  styles.navTabLabel,
+                  activeTab === 'armada' && styles.navTabLabelActive,
+                ]}>
+                Armada
+              </Text>
+            </TouchableOpacity>
+          )}
 
           {/* Tab 4: Setelan */}
           <TouchableOpacity

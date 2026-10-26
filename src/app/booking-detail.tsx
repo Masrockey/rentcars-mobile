@@ -18,16 +18,21 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { BrandColors } from '@/constants/brand';
 import { BookingDetail, BookingService } from '@/services/booking';
 import { ModernLoadingScreen } from '@/components/ModernLoading';
+import { StorageService, UserProfile } from '@/services/storage';
+import { getUserRoleInfo } from '@/utils/roleAccess';
 
 export default function BookingDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
 
   const [booking, setBooking] = useState<BookingDetail | null>(null);
+  const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('Nomor booking disalin!');
   const [toastOpacity] = useState(new Animated.Value(0));
+
+  const roleInfo = getUserRoleInfo(user);
 
   const loadBookingDetail = async () => {
     try {
@@ -50,6 +55,9 @@ export default function BookingDetailScreen() {
     let active = true;
     (async () => {
       try {
+        const storedUser = await StorageService.getUser();
+        if (active && storedUser) setUser(storedUser);
+
         if (!id) {
           if (active) setLoading(false);
           return;
@@ -158,6 +166,13 @@ export default function BookingDetailScreen() {
   };
 
   const handleAllocateArmada = () => {
+    if (!roleInfo.canAccessAllocation) {
+      Alert.alert(
+        'Akses Dibatasi',
+        'Role Anda tidak memiliki izin untuk melakukan alokasi armada. Silakan hubungi Administrator.'
+      );
+      return;
+    }
     router.push('/allocation' as any);
   };
 
@@ -563,110 +578,8 @@ export default function BookingDetailScreen() {
               <Text style={styles.settlementNote}>*Pelunasan saat serah terima fisik armada</Text>
             </View>
 
-            {/* Proof & Invoice Buttons */}
-            <View style={styles.invoiceButtonsGrid}>
-              <TouchableOpacity
-                style={styles.docButton}
-                activeOpacity={0.8}
-                onPress={() => Alert.alert('Bukti DP', 'Menampilkan foto struk transfer BCA...')}>
-                <MaterialIcons name="receipt" size={16} color={BrandColors.primary} />
-                <Text style={styles.docButtonText}>Bukti Transfer DP</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.docButton}
-                activeOpacity={0.8}
-                onPress={() => Alert.alert('Invoice PDF', 'Mengunduh invoice resmi PT. CAN...')}>
-                <MaterialIcons name="picture-as-pdf" size={16} color={BrandColors.primary} />
-                <Text style={styles.docButtonText}>Invoice PDF</Text>
-              </TouchableOpacity>
-            </View>
           </View>
 
-          {/* 6. Timeline & Riwayat Operasional (Audit Log) */}
-          <View style={styles.card}>
-            <View style={styles.cardTitleWithIcon}>
-              <MaterialIcons name="history" size={20} color={BrandColors.primary} />
-              <Text style={styles.cardSectionTitle}>Riwayat & Log Status</Text>
-            </View>
-
-            <View style={styles.auditTimelineContainer}>
-              <View style={styles.auditVerticalLine} />
-
-              {/* Step 1 Done */}
-              <View style={styles.auditStep}>
-                <View style={[styles.auditDot, { backgroundColor: BrandColors.primary }]}>
-                  <MaterialIcons name="check" size={11} color="#ffffff" />
-                </View>
-                <View style={styles.auditBody}>
-                  <View style={styles.auditHeader}>
-                    <Text style={styles.auditTitle}>Booking Dibuat</Text>
-                    <Text style={styles.auditTime}>07:15</Text>
-                  </View>
-                  <Text style={styles.auditDesc}>Oleh {marketingName}</Text>
-                </View>
-              </View>
-
-              {/* Step 2 Done */}
-              <View style={styles.auditStep}>
-                <View style={[styles.auditDot, { backgroundColor: BrandColors.primary }]}>
-                  <MaterialIcons name="check" size={11} color="#ffffff" />
-                </View>
-                <View style={styles.auditBody}>
-                  <View style={styles.auditHeader}>
-                    <Text style={styles.auditTitle}>DP {formatRupiah(dpAmount)} Terverifikasi</Text>
-                    <Text style={styles.auditTime}>07:25</Text>
-                  </View>
-                  <Text style={styles.auditDesc}>Disetujui otomatis melalui API BCA Virtual Account</Text>
-                </View>
-              </View>
-
-              {/* Step 3 Done */}
-              <View style={styles.auditStep}>
-                <View style={[styles.auditDot, { backgroundColor: BrandColors.primary }]}>
-                  <MaterialIcons name="check" size={11} color="#ffffff" />
-                </View>
-                <View style={styles.auditBody}>
-                  <View style={styles.auditHeader}>
-                    <Text style={styles.auditTitle}>Pemeriksaan Blacklist Lolos</Text>
-                    <Text style={styles.auditTime}>07:30</Text>
-                  </View>
-                  <Text style={styles.auditDesc}>Sistem verifikasi otomatis database rental daerah</Text>
-                </View>
-              </View>
-
-              {/* Step 4 Active */}
-              <View style={styles.auditStep}>
-                <View style={[styles.auditDot, { backgroundColor: BrandColors.secondaryFixed }]}>
-                  <View style={[styles.pulseDot, { width: 7, height: 7, backgroundColor: BrandColors.secondary }]} />
-                </View>
-                <View style={styles.auditBody}>
-                  <View style={styles.auditHeader}>
-                    <Text style={[styles.auditTitle, { color: BrandColors.secondary, fontWeight: '700' }]}>
-                      Menunggu Alokasi Armada
-                    </Text>
-                    <Text style={[styles.auditTime, { color: BrandColors.secondary, fontWeight: '700' }]}>
-                      Saat Ini
-                    </Text>
-                  </View>
-                  <Text style={[styles.auditDesc, { color: BrandColors.onSurface }]}>
-                    SPK dan unit belum ditetapkan oleh Kepala Pool
-                  </Text>
-                </View>
-              </View>
-
-              {/* Step 5 Upcoming */}
-              <View style={[styles.auditStep, { opacity: 0.55 }]}>
-                <View style={[styles.auditDot, { backgroundColor: BrandColors.surfaceContainer }]}>
-                  <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: BrandColors.outline }} />
-                </View>
-                <View style={styles.auditBody}>
-                  <Text style={styles.auditTitle}>Serah Terima Fisik (Handover)</Text>
-                  <Text style={styles.auditDesc}>Dijadwalkan: {startDate} • {startTime}</Text>
-                </View>
-              </View>
-            </View>
-          </View>
 
           <View style={{ height: 110 }} />
         </ScrollView>
@@ -684,20 +597,27 @@ export default function BookingDetailScreen() {
         )}
 
         {status === 'Pending' && (
-          <TouchableOpacity
-            style={styles.allocateDockBtn}
-            activeOpacity={0.85}
-            onPress={handleAllocateArmada}>
-            <Text style={styles.allocateDockBtnText}>Alokasikan Armada</Text>
-            <MaterialIcons name="arrow-forward" size={19} color="#ffffff" />
-          </TouchableOpacity>
+          roleInfo.canAccessAllocation ? (
+            <TouchableOpacity
+              style={styles.allocateDockBtn}
+              activeOpacity={0.85}
+              onPress={handleAllocateArmada}>
+              <Text style={styles.allocateDockBtnText}>Alokasikan Armada</Text>
+              <MaterialIcons name="arrow-forward" size={19} color="#ffffff" />
+            </TouchableOpacity>
+          ) : (
+            <View style={[styles.allocateDockBtn, { backgroundColor: '#fef3c7', borderWidth: 1, borderColor: '#fde68a' }]}>
+              <MaterialIcons name="hourglass-empty" size={18} color="#d97706" />
+              <Text style={[styles.allocateDockBtnText, { color: '#b45309' }]}>Menunggu Alokasi Admin</Text>
+            </View>
+          )
         )}
 
         {status === 'Confirmed' && (
           <TouchableOpacity
             style={[styles.allocateDockBtn, { backgroundColor: BrandColors.primary }]}
             activeOpacity={0.85}
-            onPress={() => router.push('/delivery' as any)}>
+            onPress={() => router.push({ pathname: '/delivery' as any, params: { id: String(booking?.id || id) } })}>
             <Text style={styles.allocateDockBtnText}>Serah Terima Unit</Text>
             <MaterialIcons name="handshake" size={19} color="#ffffff" />
           </TouchableOpacity>
@@ -707,7 +627,7 @@ export default function BookingDetailScreen() {
           <TouchableOpacity
             style={[styles.allocateDockBtn, { backgroundColor: BrandColors.secondary }]}
             activeOpacity={0.85}
-            onPress={() => router.push('/return' as any)}>
+            onPress={() => router.push({ pathname: '/return' as any, params: { id: String(booking?.id || id) } })}>
             <Text style={styles.allocateDockBtnText}>Terima Unit Kembali</Text>
             <MaterialIcons name="swap-horizontal-circle" size={19} color="#ffffff" />
           </TouchableOpacity>
@@ -1304,74 +1224,6 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     color: BrandColors.outline,
     textAlign: 'right',
-  },
-  invoiceButtonsGrid: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  docButton: {
-    flex: 1,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: BrandColors.surfaceContainer,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-  },
-  docButtonText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: BrandColors.onSurface,
-  },
-  auditTimelineContainer: {
-    position: 'relative',
-    paddingLeft: 22,
-    gap: 16,
-    marginTop: 12,
-  },
-  auditVerticalLine: {
-    position: 'absolute',
-    left: 9,
-    top: 8,
-    bottom: 12,
-    width: 2,
-    backgroundColor: BrandColors.surfaceContainerHighest,
-  },
-  auditStep: {
-    position: 'relative',
-  },
-  auditDot: {
-    position: 'absolute',
-    left: -22,
-    top: 1,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  auditBody: {
-    paddingLeft: 4,
-  },
-  auditHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  auditTitle: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: BrandColors.onSurface,
-  },
-  auditTime: {
-    fontSize: 10,
-    color: BrandColors.outline,
-  },
-  auditDesc: {
-    fontSize: 11,
-    color: BrandColors.onSurfaceVariant,
-    marginTop: 2,
   },
   bottomStickyDock: {
     position: 'absolute',

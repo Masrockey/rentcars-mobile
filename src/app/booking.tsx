@@ -17,6 +17,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { BrandColors } from '@/constants/brand';
 import { BookingDetail, BookingService } from '@/services/booking';
 import { ModernLoadingIndicator } from '@/components/ModernLoading';
+import { StorageService, UserProfile } from '@/services/storage';
+import { getUserRoleInfo } from '@/utils/roleAccess';
 
 const STATUS_FILTERS = [
   { key: 'all', label: 'Semua' },
@@ -29,6 +31,7 @@ const STATUS_FILTERS = [
 const DATE_SCOPES = ['Hari Ini', 'Besok', 'Minggu Ini', 'Bulan Ini'];
 
 export default function BookingListScreen() {
+  const [user, setUser] = useState<UserProfile | null>(null);
   const [bookings, setBookings] = useState<BookingDetail[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -37,6 +40,9 @@ export default function BookingListScreen() {
   const [selectedDateScope, setSelectedDateScope] = useState('Hari Ini');
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
+  const [accessDenied, setAccessDenied] = useState(false);
+
+  const roleInfo = getUserRoleInfo(user);
 
   const fetchBookingsData = async () => {
     try {
@@ -62,6 +68,32 @@ export default function BookingListScreen() {
     let active = true;
     (async () => {
       try {
+        const storedUser = await StorageService.getUser();
+        if (active && storedUser) setUser(storedUser);
+
+        const info = getUserRoleInfo(storedUser);
+        if (!info.canAccessBookingList) {
+          if (active) {
+            setAccessDenied(true);
+            setLoading(false);
+          }
+          Alert.alert(
+            'Akses Dibatasi',
+            'Role Peluncur hanya memiliki akses untuk modul Serah Terima dan Pengembalian unit.',
+            [
+              {
+                text: 'Buka Serah Terima',
+                onPress: () => router.replace('/delivery'),
+              },
+              {
+                text: 'Kembali',
+                onPress: () => router.replace('/welcome'),
+              },
+            ]
+          );
+          return;
+        }
+
         const listRes = await BookingService.getBookings({
           status: selectedStatus,
           search: searchQuery,
@@ -115,6 +147,53 @@ export default function BookingListScreen() {
     return { bg: BrandColors.surfaceContainerHigh, text: BrandColors.onSurfaceVariant, label: status };
   };
 
+
+  if (accessDenied) {
+    return (
+      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+        <View style={styles.topHeader}>
+          <TouchableOpacity
+            style={styles.backBtn}
+            activeOpacity={0.7}
+            onPress={() => router.replace('/welcome')}>
+            <MaterialIcons name="arrow-back" size={24} color={BrandColors.onSurface} />
+          </TouchableOpacity>
+          <Text style={styles.brandTitle}>Data Booking</Text>
+        </View>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+          <MaterialIcons name="gpp-bad" size={64} color="#dc2626" />
+          <Text style={{ fontSize: 18, fontWeight: '700', color: BrandColors.onSurface, marginTop: 16 }}>
+            Akses Dibatasi
+          </Text>
+          <Text style={{ fontSize: 14, color: BrandColors.onSurfaceVariant, textAlign: 'center', marginTop: 8, lineHeight: 20 }}>
+            Role Peluncur tidak memiliki akses ke daftar booking. Silakan gunakan modul Serah Terima atau Pengembalian unit.
+          </Text>
+          <View style={{ flexDirection: 'row', gap: 12, marginTop: 24 }}>
+            <TouchableOpacity
+              style={{
+                backgroundColor: BrandColors.surfaceContainerHigh,
+                paddingVertical: 12,
+                paddingHorizontal: 20,
+                borderRadius: 12,
+              }}
+              onPress={() => router.replace('/welcome')}>
+              <Text style={{ color: BrandColors.onSurface, fontWeight: '700' }}>Beranda</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={{
+                backgroundColor: BrandColors.primary,
+                paddingVertical: 12,
+                paddingHorizontal: 20,
+                borderRadius: 12,
+              }}
+              onPress={() => router.replace('/delivery')}>
+              <Text style={{ color: '#fff', fontWeight: '700' }}>Serah Terima Unit</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
@@ -321,13 +400,41 @@ export default function BookingListScreen() {
                     <Text style={styles.detailBtnText}>Detail Lengkap</Text>
                   </TouchableOpacity>
 
-                  <TouchableOpacity
-                    style={styles.allocateBtn}
-                    activeOpacity={0.85}
-                    onPress={() => router.push({ pathname: '/booking-detail' as any, params: { id: String(item.id) } })}>
-                    <MaterialIcons name="assignment-turned-in" size={16} color="#ffffff" />
-                    <Text style={styles.allocateBtnText}>Alokasikan Unit</Text>
-                  </TouchableOpacity>
+                  {roleInfo.isPeluncur ? (
+                    item.status === 'Confirmed' ? (
+                      <TouchableOpacity
+                        style={[styles.allocateBtn, { backgroundColor: '#059669' }]}
+                        activeOpacity={0.85}
+                        onPress={() => router.push({ pathname: '/delivery' as any, params: { id: String(item.id) } })}>
+                        <MaterialIcons name="handshake" size={16} color="#ffffff" />
+                        <Text style={styles.allocateBtnText}>Serah Unit</Text>
+                      </TouchableOpacity>
+                    ) : item.status === 'On Trip' ? (
+                      <TouchableOpacity
+                        style={[styles.allocateBtn, { backgroundColor: BrandColors.secondary }]}
+                        activeOpacity={0.85}
+                        onPress={() => router.push({ pathname: '/return' as any, params: { id: String(item.id) } })}>
+                        <MaterialIcons name="swap-horizontal-circle" size={16} color="#ffffff" />
+                        <Text style={styles.allocateBtnText}>Kembali</Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <TouchableOpacity
+                        style={[styles.allocateBtn, { backgroundColor: BrandColors.surfaceContainerHigh }]}
+                        activeOpacity={0.85}
+                        onPress={() => router.push({ pathname: '/booking-detail' as any, params: { id: String(item.id) } })}>
+                        <MaterialIcons name="visibility" size={16} color={BrandColors.onSurfaceVariant} />
+                        <Text style={[styles.allocateBtnText, { color: BrandColors.onSurfaceVariant }]}>Lihat Detail</Text>
+                      </TouchableOpacity>
+                    )
+                  ) : roleInfo.canAccessAllocation ? (
+                    <TouchableOpacity
+                      style={styles.allocateBtn}
+                      activeOpacity={0.85}
+                      onPress={() => router.push({ pathname: '/booking-detail' as any, params: { id: String(item.id) } })}>
+                      <MaterialIcons name="assignment-turned-in" size={16} color="#ffffff" />
+                      <Text style={styles.allocateBtnText}>Alokasikan Unit</Text>
+                    </TouchableOpacity>
+                  ) : null}
                 </View>
               </View>
             );
