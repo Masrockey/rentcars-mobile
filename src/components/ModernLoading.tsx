@@ -215,7 +215,7 @@ const FLEET_TIPS = [
   'Memastikan unit armada siap beroperasi dengan standar kebersihan terbaik.',
   'Sinkronisasi jadwal serah terima dan pengembalian unit secara real-time.',
   'Lakukan inspeksi checklist bodi dan bahan bakar sebelum unit diserahkan.',
-  'PT. Cahaya Auto Nusantara — The Best Partner Rental & Armada Anda.',
+  'Rentcars Mobile — The Best Partner Rental & Armada Anda.',
 ];
 
 /**

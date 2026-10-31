@@ -131,7 +131,7 @@ export default function BookingDetailScreen() {
       cleanNumber = '62' + cleanNumber.substring(1);
     }
     const message = encodeURIComponent(
-      `Halo Bpk/Ibu ${booking?.customer?.name || 'Pelanggan'}, kami dari PT. Cahaya Auto Nusantara terkait booking ${booking?.booking_code || 'mobil rental'
+      `Halo Bpk/Ibu ${booking?.customer?.name || 'Pelanggan'}, kami dari Rentcars Mobile terkait booking ${booking?.booking_code || 'mobil rental'
       }.`
     );
     Linking.openURL(`https://wa.me/${cleanNumber}?text=${message}`).catch(() => {
@@ -225,7 +225,7 @@ export default function BookingDetailScreen() {
           </TouchableOpacity>
           <View>
             <Text style={styles.headerTitle}>Detail Booking</Text>
-            <Text style={styles.headerSubtitle}>PT. Cahaya Auto Nusantara</Text>
+            <Text style={styles.headerSubtitle}>Rentcars Mobile</Text>
           </View>
         </View>
 

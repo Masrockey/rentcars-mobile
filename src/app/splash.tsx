@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { router } from 'expo-router';
+import { useState } from 'react';
 import {
   Alert,
   ScrollView,
@@ -8,16 +10,14 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons, MaterialIcons } from '@expo/vector-icons';
-import { router } from 'expo-router';
 
-import { BrandColors } from '@/constants/brand';
-import { ModernSplashScreen } from '@/components/ModernSplashScreen';
 import {
   ModernLoadingIndicator,
   ModernLoadingOverlay,
   ModernLoadingScreen,
 } from '@/components/ModernLoading';
+import { ModernSplashScreen } from '@/components/ModernSplashScreen';
+import { BrandColors } from '@/constants/brand';
 
 export default function SplashAndLoadingDemoScreen() {
   const [showSplashDemo, setShowSplashDemo] = useState(false);
@@ -65,7 +65,7 @@ export default function SplashAndLoadingDemoScreen() {
         </TouchableOpacity>
         <View style={styles.headerTitleGroup}>
           <Text style={styles.headerTitle}>Showcase Splash & Loading</Text>
-          <Text style={styles.headerSubtitle}>PT. Cahaya Auto Nusantara</Text>
+          <Text style={styles.headerSubtitle}>Rentcars Mobile</Text>
         </View>
       </View>
 
@@ -201,7 +201,7 @@ export default function SplashAndLoadingDemoScreen() {
           </View>
           <Text style={styles.sectionDescription}>
             Pengganti dialog native Alert OS dengan rounded card glassmorphic, ikon dinamis, ambient glow,
-            dan tombol modern berdesain selaras tema PT. CAN.
+            dan tombol modern berdesain selaras dengan Rentcars Mobile.
           </Text>
 
           <View style={{ gap: 10 }}>
@@ -230,7 +230,7 @@ export default function SplashAndLoadingDemoScreen() {
                   'Apakah Anda yakin ingin membatalkan alokasi unit kendaraan ini?',
                   [
                     { text: 'Batal', style: 'cancel' },
-                    { text: 'Ya, Lanjutkan', style: 'destructive', onPress: () => {} },
+                    { text: 'Ya, Lanjutkan', style: 'destructive', onPress: () => { } },
                   ]
                 );
               }}

@@ -336,7 +336,7 @@ export function ModernAlertProvider() {
           {/* Company Micro Footer */}
           <View style={styles.cardFooter}>
             <MaterialIcons name="security" size={12} color={BrandColors.outline} />
-            <Text style={styles.cardFooterText}>PT. Cahaya Auto Nusantara</Text>
+            <Text style={styles.cardFooterText}>Rentcars Mobile</Text>
           </View>
         </Animated.View>
       </Animated.View>

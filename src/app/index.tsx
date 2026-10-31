@@ -80,7 +80,7 @@ export default function LoginScreen() {
   const handleForgotPassword = () => {
     Alert.alert(
       'Lupa Kata Sandi',
-      'Silakan hubungi Administrator atau IT Support PT. Cahaya Auto Nusantara untuk reset kata sandi Anda.',
+      'Silakan hubungi Administrator atau IT Support Rentcars Mobile untuk reset kata sandi Anda.',
       [{ text: 'Tutup' }]
     );
   };
@@ -110,7 +110,7 @@ export default function LoginScreen() {
             </View>
 
             {/* Company Identity */}
-            <Text style={styles.companyTitle}>PT. CAHAYA AUTO NUSANTARA</Text>
+            <Text style={styles.companyTitle}>RENTCARS MOBILE</Text>
             <Text style={styles.companySubtitle}>THE BEST PARTNER</Text>
           </View>
 
@@ -247,7 +247,7 @@ export default function LoginScreen() {
               <Text style={styles.versionText}>CDK Enterprise V1.0.0</Text>
             </View>
             <Text style={styles.copyrightText}>
-              © 2026 PT. Cahaya Auto Nusantara. Hak Cipta Dilindungi.
+              © 2026 Rentcars Mobile. Hak Cipta Dilindungi.
             </Text>
           </View>
 

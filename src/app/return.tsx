@@ -606,7 +606,7 @@ export default function ReturnScreen() {
             </TouchableOpacity>
             <View>
               <Text style={styles.headerTitle}>Pengembalian Unit</Text>
-              <Text style={styles.headerSubtitle}>PT. Cahaya Auto Nusantara</Text>
+              <Text style={styles.headerSubtitle}>Rentcars Mobile</Text>
             </View>
           </View>
           <TouchableOpacity style={styles.moreButton}>

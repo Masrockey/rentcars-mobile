@@ -337,7 +337,7 @@ export default function AllocationScreen() {
                 </Text>
               </View>
             </View>
-            <Text style={styles.headerSubtitle}>PT. Cahaya Auto Nusantara</Text>
+            <Text style={styles.headerSubtitle}>Rentcars Mobile</Text>
           </View>
         </View>
       </View>

@@ -11,7 +11,7 @@ export const ENV = {
 if (!ENV.API_BASE_URL) {
   console.warn(
     '[ENV WARNING] EXPO_PUBLIC_API_BASE_URL belum disetel di file .env! ' +
-    'Pastikan file .env memiliki EXPO_PUBLIC_API_BASE_URL=https://rent.cdk-project.web.id/api/v1'
+    'Pastikan file .env memiliki EXPO_PUBLIC_API_BASE_URL=https://localhost:8000/api/v1'
   );
 }
 

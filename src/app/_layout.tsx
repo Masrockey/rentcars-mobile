@@ -1,11 +1,11 @@
-import { useState } from 'react';
 import Stack from 'expo-router/stack';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
+import { useState } from 'react';
 import { Alert } from 'react-native';
 
-import { ModernSplashScreen } from '@/components/ModernSplashScreen';
 import { ModernAlert, ModernAlertProvider } from '@/components/ModernAlertModal';
+import { ModernSplashScreen } from '@/components/ModernSplashScreen';
 
 // Pasang modern alert modal global sebagai pengganti dialog Alert bawaan OS
 Alert.alert = (title, message, buttons, options) => {
@@ -13,7 +13,7 @@ Alert.alert = (title, message, buttons, options) => {
 };
 
 // Cegah auto-hide native splash agar handoff ke animasi berjalan mulus tanpa kedipan layar
-SplashScreen.preventAutoHideAsync().catch(() => {});
+SplashScreen.preventAutoHideAsync().catch(() => { });
 
 export default function RootLayout() {
   const [showSplash, setShowSplash] = useState(true);

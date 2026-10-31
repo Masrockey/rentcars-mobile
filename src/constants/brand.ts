@@ -1,6 +1,6 @@
 /**
  * Design Tokens & Theme Colors
- * Diadaptasi langsung dari spesifikasi desain HTML Tailwind PT. Cahaya Auto Nusantara
+ * Diadaptasi langsung dari spesifikasi desain HTML Tailwind Rentcars Mobile
  */
 
 export const BrandColors = {

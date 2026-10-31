@@ -47,5 +47,6 @@
     "web": "expo start --web",
     "lint": "expo lint"
   },
+  "license": "MIT",
   "private": true
 }

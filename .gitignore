@@ -3,7 +3,7 @@
 # dependencies
 node_modules/
 apidoc.md
-
+.claude
 # Expo
 .expo/
 dist/

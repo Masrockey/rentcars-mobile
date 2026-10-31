@@ -519,7 +519,7 @@ export default function BookingCreateScreen() {
           <View style={styles.stepperTopRow}>
             <View style={styles.pulseRow}>
               <View style={styles.pulseDot} />
-              <Text style={styles.companyBadgeText}>PT. CAHAYA AUTO NUSANTARA</Text>
+              <Text style={styles.companyBadgeText}>RENTCARS MOBILE</Text>
             </View>
           </View>
 

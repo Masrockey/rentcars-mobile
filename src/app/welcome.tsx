@@ -499,7 +499,7 @@ export default function BerandaScreen() {
           </View>
           <View style={styles.brandTextGroup}>
             <View style={styles.brandTitleRow}>
-              <Text style={styles.brandTitle}>PT. Cahaya Auto Nusantara</Text>
+              <Text style={styles.brandTitle}>Rentcars Mobile</Text>
             </View>
             <Text style={styles.brandSubtitle}>Best Rent Car Partner</Text>
           </View>

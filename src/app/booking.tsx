@@ -213,7 +213,7 @@ export default function BookingListScreen() {
                 <Text style={styles.quarterBadgeText}>{totalCount > 0 ? `${totalCount} Data` : '2026/Q4'}</Text>
               </View>
             </View>
-            <Text style={styles.brandSubtitle}>PT. Cahaya Auto Nusantara</Text>
+            <Text style={styles.brandSubtitle}>Rentcars Mobile</Text>
           </View>
         </View>
 

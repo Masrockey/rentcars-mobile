@@ -32,7 +32,7 @@ export interface ModernSplashScreenProps {
 
 /**
  * ModernSplashScreen
- * Splash screen beranimasi premium dengan identitas PT. Cahaya Auto Nusantara:
+ * Splash screen beranimasi premium dengan identitas Rentcars Mobile:
  * - Pulse radar otomotif & gelombang surya keemasan
  * - Entrance spring logo & glassmorphism badge
  * - Staggered fade typography & brand slogan "The Best Partner"
@@ -397,7 +397,7 @@ export function ModernSplashScreen({
               transform: [{ translateY: titleTranslateY }],
             },
           ]}>
-          <Text style={styles.companyName}>PT. CAHAYA AUTO NUSANTARA</Text>
+          <Text style={styles.companyName}>RENTCARS MOBILE</Text>
 
           {/* Golden Badge: "THE BEST PARTNER" */}
           <View style={styles.goldBadge}>
